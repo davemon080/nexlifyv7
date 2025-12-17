@@ -92,11 +92,13 @@ export const Marketplace: React.FC = () => {
              callback: async function(response: any) {
                  await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
                  await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
-                 alert("Payment successful! You can now download the file.");
                  
                  // Refresh user state to reflect purchase immediately
                  const updatedUser = getCurrentUser();
                  setUser(updatedUser);
+
+                 alert("Payment successful! Downloading your file...");
+                 handleDownload(product);
              },
              onClose: function() {
                  alert('Transaction was not completed.');
