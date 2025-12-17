@@ -1,4 +1,4 @@
-import { Product, Inquiry, Service, EarningMethod, Course, User, ActivityLog, Module, Lesson } from '../types';
+import { Product, Inquiry, Service, EarningMethod, Course, User, ActivityLog, Module, Lesson, AppSettings } from '../types';
 
 // Vercel Serverless Functions are served at /api by default
 const API_URL = '/api';
@@ -43,6 +43,20 @@ const setLocal = (key: string, data: any[]) => {
 };
 
 export const isCloudEnabled = () => true;
+
+// --- APP SETTINGS ---
+export const getAppSettings = (): AppSettings => {
+    try {
+        const stored = localStorage.getItem('appSettings');
+        return stored ? JSON.parse(stored) : { platformName: 'Nexlify' };
+    } catch { return { platformName: 'Nexlify' }; }
+};
+
+export const updateAppSettings = (settings: AppSettings) => {
+    localStorage.setItem('appSettings', JSON.stringify(settings));
+    // Dispatch event so other components (like Navbar) can update immediately
+    window.dispatchEvent(new Event('appSettingsChanged'));
+};
 
 // --- INITIALIZATION ---
 export const initializeDatabase = async () => {

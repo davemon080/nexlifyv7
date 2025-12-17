@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser } from '../services/mockData';
-import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion } from '../types';
+import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings } from '../services/mockData';
+import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion, AppSettings } from '../types';
 import { Button, Input, Card, Badge, Textarea } from '../components/UI';
-import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle, Settings, Save, BarChart3, TrendingUp } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'products' | 'inquiries' | 'training' | 'users'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'inquiries' | 'training' | 'users' | 'settings'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings>({ platformName: 'Nexlify' });
   const [showProductModal, setShowProductModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -54,22 +55,35 @@ export const Admin: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [pData, iData, cData, uData] = await Promise.all([
+      const [pData, iData, cData, uData, settings] = await Promise.all([
         getProducts(),
         getInquiries(),
         getCourses(),
-        getAllUsers()
+        getAllUsers(),
+        getAppSettings()
       ]);
       setProducts(pData);
       setInquiries(iData);
       setCourses(cData);
       setUsers(uData);
+      setAppSettings(settings);
     } catch (error) {
       console.error("Failed to load admin data", error);
     } finally {
       setLoading(false);
     }
   };
+
+  // --- STATISTICS CALCULATION ---
+  const totalRevenue = users.reduce((acc, user) => {
+    if(!user.enrolledCourses) return acc;
+    // Calculate value of courses user is enrolled in
+    const userValue = user.enrolledCourses.reduce((sum, cId) => {
+        const course = courses.find(c => c.id === cId);
+        return sum + (course?.price || 0);
+    }, 0);
+    return acc + userValue;
+  }, 0);
 
   // --- DATABASE EXPORT LOGIC ---
   const handleExportDatabase = () => {
@@ -91,6 +105,23 @@ export const Admin: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+  };
+
+  // --- SETTINGS HANDLERS ---
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setAppSettings({ ...appSettings, logoUrl: reader.result as string });
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
+  const handleSaveSettings = () => {
+      updateAppSettings(appSettings);
+      alert("Settings saved successfully!");
   };
 
   // --- USER HANDLERS ---
@@ -365,6 +396,47 @@ export const Admin: React.FC = () => {
   return (
     <div className="min-h-screen p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
+        
+        {/* DASHBOARD STATS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <Card className="p-6 bg-gradient-to-br from-[#1E1F20] to-[#131314] flex items-center gap-4">
+                <div className="p-3 bg-[#0F5223] rounded-xl border border-[#6DD58C]/30 text-[#6DD58C]">
+                    <Wallet className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-[#8E918F] text-xs font-medium uppercase tracking-wider">Total Revenue</p>
+                    <h2 className="text-2xl font-bold text-[#E3E3E3]">₦{totalRevenue.toLocaleString()}</h2>
+                </div>
+            </Card>
+            <Card className="p-6 bg-gradient-to-br from-[#1E1F20] to-[#131314] flex items-center gap-4">
+                <div className="p-3 bg-[#0842A0] rounded-xl border border-[#A8C7FA]/30 text-[#A8C7FA]">
+                    <Users className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-[#8E918F] text-xs font-medium uppercase tracking-wider">Total Users</p>
+                    <h2 className="text-2xl font-bold text-[#E3E3E3]">{users.length}</h2>
+                </div>
+            </Card>
+            <Card className="p-6 bg-gradient-to-br from-[#1E1F20] to-[#131314] flex items-center gap-4">
+                <div className="p-3 bg-[#5B4300] rounded-xl border border-[#FFD97D]/30 text-[#FFD97D]">
+                    <BarChart3 className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-[#8E918F] text-xs font-medium uppercase tracking-wider">Products Sold</p>
+                    <h2 className="text-2xl font-bold text-[#E3E3E3]">--</h2>
+                </div>
+            </Card>
+            <Card className="p-6 bg-gradient-to-br from-[#1E1F20] to-[#131314] flex items-center gap-4">
+                <div className="p-3 bg-[#370007] rounded-xl border border-[#F2B8B5]/30 text-[#F2B8B5]">
+                    <TrendingUp className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-[#8E918F] text-xs font-medium uppercase tracking-wider">Growth</p>
+                    <h2 className="text-2xl font-bold text-[#E3E3E3]">+12%</h2>
+                </div>
+            </Card>
+        </div>
+
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-10 gap-6">
           <div>
             <Badge color="blue" >Administrator</Badge>
@@ -377,17 +449,61 @@ export const Admin: React.FC = () => {
                     <LayoutGrid className="w-4 h-4 mr-2" /> Products
                 </button>
                 <button onClick={() => setActiveTab('users')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'users' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
-                    <Users className="w-4 h-4 mr-2" /> Database <span className="ml-2 bg-[#062E6F] text-[#A8C7FA] text-xs px-2 py-0.5 rounded-full">{users.length}</span>
+                    <Users className="w-4 h-4 mr-2" /> Users
                 </button>
                 <button onClick={() => setActiveTab('inquiries')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'inquiries' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
-                    <Mail className="w-4 h-4 mr-2" /> Inquiries {inquiries.length > 0 && <span className="ml-2 bg-[#062E6F] text-[#A8C7FA] text-xs px-2 py-0.5 rounded-full">{inquiries.length}</span>}
+                    <Mail className="w-4 h-4 mr-2" /> Inquiries
                 </button>
                 <button onClick={() => setActiveTab('training')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'training' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
                     <GraduationCap className="w-4 h-4 mr-2" /> Training
                 </button>
+                <button onClick={() => setActiveTab('settings')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
+                    <Settings className="w-4 h-4 mr-2" /> Settings
+                </button>
             </div>
           </div>
         </div>
+
+        {/* --- SETTINGS TAB --- */}
+        {activeTab === 'settings' && (
+            <div className="max-w-2xl mx-auto">
+                <Card className="p-8">
+                    <h2 className="text-xl font-bold text-[#E3E3E3] mb-6 flex items-center gap-2"><Settings className="w-5 h-5" /> Platform Configuration</h2>
+                    
+                    <div className="space-y-6">
+                        <Input 
+                            label="Platform Name" 
+                            value={appSettings.platformName} 
+                            onChange={(e) => setAppSettings({...appSettings, platformName: e.target.value})} 
+                        />
+                        
+                        <div className="space-y-2">
+                            <label className="block text-sm font-medium text-[#C4C7C5] ml-1">App Logo</label>
+                            <div className="flex items-center gap-6">
+                                <div className="w-24 h-24 rounded-full bg-[#131314] border border-[#444746] flex items-center justify-center overflow-hidden">
+                                    {appSettings.logoUrl ? (
+                                        <img src={appSettings.logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-[#8E918F] text-xs">No Logo</span>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <label className="cursor-pointer inline-flex items-center justify-center px-4 py-2 bg-[#1E1F20] border border-[#444746] rounded-full text-[#E3E3E3] hover:bg-[#2D2E30] transition-colors text-sm font-medium">
+                                        <Upload className="w-4 h-4 mr-2" /> Upload New Logo
+                                        <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                                    </label>
+                                    <p className="text-xs text-[#8E918F] mt-2">Recommended size: 128x128px. PNG or JPG.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-6 border-t border-[#444746] flex justify-end">
+                            <Button onClick={handleSaveSettings} icon={Save}>Save Changes</Button>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        )}
 
         {/* --- PRODUCTS TAB --- */}
         {activeTab === 'products' && (

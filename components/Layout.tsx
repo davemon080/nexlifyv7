@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, ShoppingBag, Briefcase, DollarSign, LayoutDashboard, Home, Sparkles, GraduationCap, User as UserIcon, Cloud, CloudOff } from 'lucide-react';
 import { Button } from './UI';
-import { isCloudEnabled } from '../services/mockData';
+import { isCloudEnabled, getAppSettings } from '../services/mockData';
+import { AppSettings } from '../types';
 
 export const Navbar: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [cloudActive, setCloudActive] = useState(false);
+  const [appSettings, setAppSettings] = useState<AppSettings>(getAppSettings());
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -16,7 +18,17 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     setIsOpen(false);
     setCloudActive(isCloudEnabled());
+    setAppSettings(getAppSettings()); // Update on navigation
   }, [location]);
+
+  // Listen for settings changes
+  useEffect(() => {
+    const handleSettingsChange = () => {
+        setAppSettings(getAppSettings());
+    };
+    window.addEventListener('appSettingsChanged', handleSettingsChange);
+    return () => window.removeEventListener('appSettingsChanged', handleSettingsChange);
+  }, []);
 
   const navItems = [
     { name: 'Home', path: '/', icon: Home },
@@ -49,11 +61,19 @@ export const Navbar: React.FC = () => {
         <div className="flex justify-between h-20">
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center gap-3 group">
-              <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] to-[#D96570] rounded-full flex items-center justify-center text-white font-bold text-xl group-hover:scale-105 transition-transform duration-300 shadow-[0_0_15px_rgba(66,133,244,0.4)]">
-                <Sparkles className="w-5 h-5" />
-              </div>
+              {appSettings.logoUrl ? (
+                <img 
+                    src={appSettings.logoUrl} 
+                    alt="Logo" 
+                    className="w-10 h-10 rounded-full object-cover shadow-[0_0_15px_rgba(66,133,244,0.4)] group-hover:scale-105 transition-transform duration-300"
+                />
+              ) : (
+                <div className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-tr from-[#4285F4] via-[#9B72CB] to-[#D96570] rounded-full flex items-center justify-center text-white font-bold text-xl group-hover:scale-105 transition-transform duration-300 shadow-[0_0_15px_rgba(66,133,244,0.4)]">
+                    <Sparkles className="w-5 h-5" />
+                </div>
+              )}
               <div className="flex flex-col">
-                <span className="font-bold text-xl md:text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#E3E3E3] to-[#C4C7C5] tracking-tight">Nexlify</span>
+                <span className="font-bold text-xl md:text-2xl bg-clip-text text-transparent bg-gradient-to-r from-[#E3E3E3] to-[#C4C7C5] tracking-tight">{appSettings.platformName}</span>
               </div>
             </Link>
              {/* DB Status Indicator */}

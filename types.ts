@@ -6,6 +6,11 @@ export enum ProductCategory {
   DESIGN = 'Design'
 }
 
+export interface AppSettings {
+  logoUrl?: string;
+  platformName: string;
+}
+
 export interface Product {
   id: string;
   title: string;
