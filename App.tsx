@@ -13,6 +13,8 @@ import { CourseDetail } from './pages/CourseDetail';
 import { Classroom } from './pages/Classroom';
 import { Profile } from './pages/Profile';
 import { AiTools } from './pages/AiTools';
+import { VideoDownloader } from './pages/VideoDownloader';
+import { VideoTranscribe } from './pages/VideoTranscribe';
 import { ScrollToTop } from './components/ScrollToTop';
 import { initializeDatabase } from './services/mockData';
 
@@ -29,7 +31,12 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/market" element={<Marketplace />} />
+          
+          {/* AI Tools Routes */}
           <Route path="/ai-tools" element={<AiTools />} />
+          <Route path="/ai-tools/downloader" element={<VideoDownloader />} />
+          <Route path="/ai-tools/transcribe" element={<VideoTranscribe />} />
+
           <Route path="/hire" element={<Hire />} />
           <Route path="/earn" element={<Earn />} />
           <Route path="/training" element={<Training />} />
