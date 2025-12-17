@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { getProducts, logUserActivity, getCurrentUser } from '../services/mockData';
+import { getProducts, logUserActivity, getCurrentUser, recordTransaction } from '../services/mockData';
 import { Product, ProductCategory } from '../types';
 import { Button, Card, Badge } from '../components/UI';
 import { Search, Filter, Download, ShoppingCart, Loader2, Eye, X, Share2, Copy } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const Marketplace: React.FC = () => {
+  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,16 +62,39 @@ export const Marketplace: React.FC = () => {
   };
 
   const handlePurchase = (product: Product) => {
-    const confirmed = window.confirm(`Confirm purchase of ${product.title} for ₦${product.price.toLocaleString()}?`);
-    if (confirmed) {
-        const user = getCurrentUser();
-        if(user) logUserActivity(user.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
+    const user = getCurrentUser();
+    if (!user) {
+        alert("You must be logged in to purchase products.");
+        navigate('/login');
+        return;
+    }
 
-        if(product.downloadUrl) {
-            handleDownload(product);
-        } else {
-            alert("Thank you for your purchase! The item has been sent to your email.");
-        }
+    if (product.price > 0) {
+         const PaystackPop = (window as any).PaystackPop;
+         if (!PaystackPop) {
+             alert("Payment system is loading, please try again in a moment.");
+             return;
+         }
+
+         const handler = PaystackPop.setup({
+             key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11',
+             email: user.email,
+             amount: product.price * 100, // Amount in kobo
+             currency: 'NGN',
+             ref: ''+Math.floor((Math.random() * 1000000000) + 1),
+             callback: async function(response: any) {
+                 await recordTransaction(user.id, 'product_purchase', product.id, product.price, response.reference);
+                 await logUserActivity(user.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
+                 alert("Payment successful! Downloading file...");
+                 handleDownload(product);
+             },
+             onClose: function() {
+                 alert('Transaction was not completed.');
+             },
+         });
+         handler.openIframe();
+    } else {
+         handleDownload(product);
     }
   };
 
@@ -263,8 +288,8 @@ export const Marketplace: React.FC = () => {
                                     handleDownload(previewProduct);
                                 } else {
                                     handlePurchase(previewProduct);
+                                    setPreviewProduct(null); // Close modal on purchase flow
                                 }
-                                setPreviewProduct(null);
                             }}
                         >
                             {previewProduct.price === 0 ? 'Download Template' : `Buy Template (₦${previewProduct.price.toLocaleString()})`}

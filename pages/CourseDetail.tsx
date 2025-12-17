@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCourseById, enrollInCourse, checkEnrollment } from '../services/mockData';
+import { getCourseById, enrollInCourse, checkEnrollment, getCurrentUser, recordTransaction } from '../services/mockData';
 import { Course } from '../types';
 import { Button, Card, Badge } from '../components/UI';
 import { CheckCircle, PlayCircle, Lock, Calendar, Loader2 } from 'lucide-react';
@@ -28,13 +28,63 @@ export const CourseDetail: React.FC = () => {
 
   const handleEnroll = async () => {
     if (!course) return;
+
+    const user = getCurrentUser();
+    if (!user) {
+        alert("You must be logged in to enroll.");
+        navigate('/login');
+        return;
+    }
+
     setEnrolling(true);
-    // Simulate API call
-    await enrollInCourse(course.id);
-    localStorage.setItem(`enrolled_${course.id}`, 'true');
-    setIsEnrolled(true);
-    setEnrolling(false);
-    navigate(`/classroom/${course.id}`);
+
+    const completeEnrollment = async (reference?: string) => {
+        try {
+            await enrollInCourse(course.id);
+            localStorage.setItem(`enrolled_${course.id}`, 'true');
+            if (reference) {
+                await recordTransaction(user.id, 'course_enrollment', course.id, course.price, reference);
+            }
+            setIsEnrolled(true);
+            navigate(`/classroom/${course.id}`);
+        } catch (e) {
+            console.error(e);
+            alert("Enrollment process encountered an issue. Please contact support.");
+        } finally {
+            setEnrolling(false);
+        }
+    };
+
+    if (course.price > 0) {
+        // Trigger Paystack
+        const PaystackPop = (window as any).PaystackPop;
+        if (!PaystackPop) {
+            alert("Payment system is loading, please try again in a moment.");
+            setEnrolling(false);
+            return;
+        }
+
+        const handler = PaystackPop.setup({
+            key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11',
+            email: user.email,
+            amount: course.price * 100, // Amount in kobo
+            currency: 'NGN',
+            ref: ''+Math.floor((Math.random() * 1000000000) + 1),
+            callback: function(response: any) {
+                // Payment complete
+                completeEnrollment(response.reference);
+            },
+            onClose: function() {
+                alert('Transaction was not completed, window closed.');
+                setEnrolling(false);
+            },
+        });
+        handler.openIframe();
+
+    } else {
+        // Free Course
+        completeEnrollment();
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#A8C7FA] w-10 h-10" /></div>;
@@ -58,7 +108,7 @@ export const CourseDetail: React.FC = () => {
                 </Button>
               ) : (
                 <Button size="lg" onClick={handleEnroll} isLoading={enrolling}>
-                  Enroll Now - ₦{course.price.toLocaleString()}
+                  {course.price > 0 ? `Enroll Now - ₦${course.price.toLocaleString()}` : 'Enroll for Free'}
                 </Button>
               )}
             </div>

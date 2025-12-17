@@ -238,6 +238,16 @@ export const getUserActivity = async (userId: string): Promise<ActivityLog[]> =>
     }
 };
 
+// --- TRANSACTIONS ---
+
+export const recordTransaction = async (userId: string, type: 'course_enrollment' | 'product_purchase', itemId: string, amount: number, reference: string) => {
+    try {
+        await api('recordTransaction', 'POST', { userId, type, itemId, amount, reference });
+    } catch (e) {
+        console.warn("Failed to record transaction to DB", e);
+    }
+};
+
 // --- PRODUCT SERVICES ---
 
 export const getProducts = async (): Promise<Product[]> => {

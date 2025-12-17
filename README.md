@@ -78,6 +78,18 @@ CREATE TABLE IF NOT EXISTS enrollments (
   PRIMARY KEY (user_id, course_id)
 );
 
+-- Transactions Table
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  type TEXT, -- 'course_enrollment' or 'product_purchase'
+  item_id TEXT,
+  amount DECIMAL(10, 2),
+  reference TEXT,
+  status TEXT DEFAULT 'success',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Inquiries Table
 CREATE TABLE IF NOT EXISTS inquiries (
   id TEXT PRIMARY KEY,
@@ -114,9 +126,19 @@ CREATE TABLE IF NOT EXISTS app_settings (
   logo_url TEXT,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
--- Insert default settings row
 INSERT INTO app_settings (id, platform_name) VALUES (1, 'Nexlify') ON CONFLICT (id) DO NOTHING;
+
+-- Create transactions table
+CREATE TABLE IF NOT EXISTS transactions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT REFERENCES users(id),
+  type TEXT,
+  item_id TEXT,
+  amount DECIMAL(10, 2),
+  reference TEXT,
+  status TEXT DEFAULT 'success',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ## Local Development

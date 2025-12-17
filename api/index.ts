@@ -189,6 +189,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true });
     }
 
+    // --- TRANSACTIONS ---
+    if (action === 'recordTransaction') {
+      const { userId, type, itemId, amount, reference } = body;
+      const id = `tx-${Date.now()}`;
+      await pool.query(
+        'INSERT INTO transactions (id, user_id, type, item_id, amount, reference) VALUES ($1, $2, $3, $4, $5, $6)',
+        [id, userId, type, itemId, amount, reference]
+      );
+      return res.status(200).json({ success: true });
+    }
+
     // --- PRODUCTS ---
     if (action === 'getProducts') {
       const { rows } = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
