@@ -1,45 +1,126 @@
-import React, { useState } from 'react';
-import { Button, Card, Input, Badge } from '../components/UI';
-import { Download, Link as LinkIcon, Youtube, Facebook, Instagram, Video, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Button, Card, Badge } from '../components/UI';
+import { Download, Link as LinkIcon, Youtube, Facebook, Instagram, Video, CheckCircle, Loader2, AlertCircle, FileVideo, RefreshCw } from 'lucide-react';
 
 export const VideoDownloader: React.FC = () => {
   const [url, setUrl] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusStage, setStatusStage] = useState(''); // 'resolving', 'downloading', 'converting', 'ready'
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
 
-  const handleDownload = async (e: React.FormEvent) => {
+  // Helper to get YouTube ID
+  const getYouTubeId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const handleProcess = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!url) return;
     
-    setLoading(true);
+    setProcessing(true);
     setResult(null);
     setError('');
+    setProgress(0);
+    setStatusStage('resolving');
 
-    // Simulate API processing delay
+    // 1. Resolve URL (Simulated)
     setTimeout(() => {
-        setLoading(false);
-        if (url.includes('youtube') || url.includes('youtu.be') || url.includes('facebook') || url.includes('instagram')) {
-             setResult({
-                 title: 'Amazing Video Content - ( viral video )',
-                 thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
-                 duration: '10:05',
-                 source: url.includes('youtube') ? 'YouTube' : url.includes('facebook') ? 'Facebook' : 'Instagram',
-                 formats: [
-                     { quality: '1080p (HD)', size: '145 MB', type: 'mp4' },
-                     { quality: '720p', size: '85 MB', type: 'mp4' },
-                     { quality: '480p', size: '45 MB', type: 'mp4' },
-                     { quality: 'Audio Only', size: '12 MB', type: 'mp3' }
-                 ]
-             });
-        } else {
-            setError('Unsupported URL or private video. Please try a public link from YouTube, Facebook, or Instagram.');
+        const ytId = getYouTubeId(url);
+        
+        // Basic Validation simulation
+        if (!url.includes('http')) {
+            setError('Please enter a valid URL starting with http:// or https://');
+            setProcessing(false);
+            return;
         }
-    }, 2000);
+
+        // 2. Start Download Simulation
+        setStatusStage('downloading');
+        let currentProgress = 0;
+        
+        const interval = setInterval(() => {
+            currentProgress += Math.floor(Math.random() * 15) + 5;
+            
+            if (currentProgress > 60 && statusStage !== 'converting') {
+                 setStatusStage('converting');
+            }
+            
+            if (currentProgress >= 100) {
+                clearInterval(interval);
+                setProgress(100);
+                finalizeResult(ytId);
+            } else {
+                setProgress(currentProgress);
+            }
+        }, 800);
+
+    }, 1500);
   };
 
-  const simulateDownload = (format: any) => {
-      alert(`Starting download for: ${result.title} [${format.quality}]`);
+  const finalizeResult = (ytId: string | null) => {
+      setProcessing(false);
+      setStatusStage('ready');
+      
+      const isYouTube = !!ytId;
+      
+      setResult({
+          title: isYouTube ? 'Extracted Video Content' : 'Social Media Video Clip',
+          thumbnail: isYouTube 
+            ? `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg` 
+            : 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80',
+          duration: '04:20',
+          source: isYouTube ? 'YouTube' : 'External Source',
+          embedUrl: isYouTube ? `https://www.youtube.com/embed/${ytId}` : null,
+          formats: [
+              { quality: '1080p (HD)', size: '145 MB', type: 'mp4', url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4' }, // Sample video for demo
+              { quality: '720p', size: '85 MB', type: 'mp4', url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4' },
+              { quality: '480p', size: '45 MB', type: 'mp4', url: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4' },
+              { quality: 'Audio Only', size: '12 MB', type: 'mp3', url: '#' }
+          ]
+      });
+  };
+
+  const handleDownloadFile = async (format: any) => {
+      // In a real app, this would be a direct link to the backend stream.
+      // Here we simulate the browser "serving" the file by creating a blob or opening the link.
+      
+      if(format.url === '#') {
+          alert("Audio extraction requires server-side processing. (Demo Mode)");
+          return;
+      }
+
+      const confirm = window.confirm(`Start downloading ${result.title} in ${format.quality}?`);
+      if(!confirm) return;
+
+      // Create a fake downloading anchor to simulate the UX
+      try {
+          // For demo purposes, we fetch a small sample file to show the browser native download behavior
+          const res = await fetch(format.url);
+          const blob = await res.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = `nexlify_video_${Date.now()}.${format.type}`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(blobUrl);
+          document.body.removeChild(a);
+      } catch (e) {
+          // Fallback if CORS blocks the sample fetch
+          window.open(format.url, '_blank');
+      }
+  };
+
+  const reset = () => {
+      setResult(null);
+      setUrl('');
+      setProgress(0);
+      setStatusStage('');
   };
 
   return (
@@ -53,88 +134,134 @@ export const VideoDownloader: React.FC = () => {
             </p>
         </div>
 
+        {/* Input Section */}
         <Card className="p-8 md:p-10 mb-8 bg-[#1E1F20] border-t-4 border-t-[#6DD58C]">
-            <form onSubmit={handleDownload} className="relative">
-                <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <LinkIcon className="h-5 w-5 text-[#8E918F]" />
+            {!processing && !result ? (
+                <form onSubmit={handleProcess} className="relative animate-fadeIn">
+                    <div className="flex flex-col md:flex-row gap-4">
+                        <div className="flex-1 relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <LinkIcon className="h-5 w-5 text-[#8E918F]" />
+                            </div>
+                            <input
+                                type="text"
+                                value={url}
+                                onChange={(e) => setUrl(e.target.value)}
+                                placeholder="Paste video URL here (e.g., https://youtube.com/...)"
+                                className="w-full pl-12 pr-4 py-4 bg-[#131314] border border-[#444746] rounded-xl text-[#E3E3E3] focus:ring-2 focus:ring-[#6DD58C] focus:border-transparent outline-none transition-all"
+                            />
                         </div>
-                        <input
-                            type="text"
-                            value={url}
-                            onChange={(e) => setUrl(e.target.value)}
-                            placeholder="Paste video URL here (e.g., https://youtube.com/...)"
-                            className="w-full pl-12 pr-4 py-4 bg-[#131314] border border-[#444746] rounded-xl text-[#E3E3E3] focus:ring-2 focus:ring-[#6DD58C] focus:border-transparent outline-none transition-all"
-                        />
+                        <Button size="lg" className="bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3] h-auto py-4 px-8" icon={Download}>
+                            Start
+                        </Button>
                     </div>
-                    <Button size="lg" className="bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3] h-auto py-4 px-8" isLoading={loading} icon={Download}>
-                        Download
-                    </Button>
+                    <div className="flex justify-center gap-6 mt-6 text-[#8E918F] text-sm">
+                        <span className="flex items-center gap-2"><Youtube className="w-4 h-4" /> YouTube</span>
+                        <span className="flex items-center gap-2"><Facebook className="w-4 h-4" /> Facebook</span>
+                        <span className="flex items-center gap-2"><Instagram className="w-4 h-4" /> Instagram</span>
+                    </div>
+                </form>
+            ) : processing ? (
+                 <div className="py-8 text-center animate-fadeIn">
+                    <div className="mb-6 relative h-4 w-full bg-[#131314] rounded-full overflow-hidden border border-[#444746]">
+                        <div 
+                            className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#6DD58C] to-[#A8C7FA] transition-all duration-300 ease-out"
+                            style={{ width: `${progress}%` }}
+                        ></div>
+                    </div>
+                    <div className="flex flex-col items-center justify-center gap-3">
+                        <Loader2 className="w-8 h-8 text-[#6DD58C] animate-spin" />
+                        <h3 className="text-xl font-bold text-[#E3E3E3] capitalize">
+                            {statusStage === 'resolving' && 'Resolving URL...'}
+                            {statusStage === 'downloading' && 'Fetching Video Stream...'}
+                            {statusStage === 'converting' && 'Processing Formats...'}
+                        </h3>
+                        <p className="text-[#8E918F] text-sm">{progress}% Complete</p>
+                    </div>
+                 </div>
+            ) : (
+                <div className="animate-slideUp">
+                    <div className="flex justify-between items-center mb-6 border-b border-[#444746] pb-4">
+                        <h3 className="text-xl font-bold text-[#E3E3E3]">Download Ready</h3>
+                        <Button variant="outline" size="sm" onClick={reset} icon={RefreshCw}>Download Another</Button>
+                    </div>
+                    
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* Video Preview */}
+                        <div className="w-full lg:w-1/2">
+                            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-[#444746] shadow-2xl relative">
+                                {result.embedUrl ? (
+                                    <iframe 
+                                        src={result.embedUrl} 
+                                        title="Video Preview"
+                                        className="w-full h-full"
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-[#131314]">
+                                        <div className="text-center">
+                                            <img src={result.thumbnail} alt="thumb" className="w-full h-full object-cover opacity-50 absolute inset-0" />
+                                            <div className="relative z-10 p-4 bg-black/60 rounded-xl backdrop-blur-sm">
+                                                <Video className="w-12 h-12 text-[#E3E3E3] mx-auto mb-2" />
+                                                <p className="text-[#E3E3E3] font-medium">Preview Unavailable</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-4">
+                                <h4 className="font-bold text-[#E3E3E3] line-clamp-2">{result.title}</h4>
+                                <div className="flex gap-3 mt-2 text-sm text-[#8E918F]">
+                                    <span className="bg-[#131314] px-2 py-1 rounded border border-[#444746]">{result.source}</span>
+                                    <span className="bg-[#131314] px-2 py-1 rounded border border-[#444746]">{result.duration}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Download Options */}
+                        <div className="w-full lg:w-1/2 space-y-4">
+                            <p className="text-sm text-[#8E918F] font-medium uppercase tracking-wider mb-2">Available Formats</p>
+                            {result.formats.map((format: any, idx: number) => (
+                                <div 
+                                    key={idx}
+                                    className="flex items-center justify-between p-4 rounded-xl border border-[#444746] bg-[#131314] hover:border-[#6DD58C] transition-all group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-lg ${format.type === 'mp3' ? 'bg-[#9B72CB]/20 text-[#9B72CB]' : 'bg-[#6DD58C]/20 text-[#6DD58C]'}`}>
+                                            {format.type === 'mp3' ? <FileVideo className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                                        </div>
+                                        <div>
+                                            <div className="text-[#E3E3E3] font-bold">{format.quality}</div>
+                                            <div className="text-[#8E918F] text-xs uppercase">{format.type} • {format.size}</div>
+                                        </div>
+                                    </div>
+                                    <Button 
+                                        size="sm" 
+                                        className={format.type === 'mp3' ? 'bg-[#9B72CB] text-white hover:bg-[#8A58C2]' : 'bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3]'}
+                                        icon={Download}
+                                        onClick={() => handleDownloadFile(format)}
+                                    >
+                                        Download
+                                    </Button>
+                                </div>
+                            ))}
+                            
+                            <div className="mt-6 p-4 bg-[#A8C7FA]/10 rounded-xl border border-[#A8C7FA]/20 text-sm text-[#A8C7FA] flex gap-3 items-start">
+                                <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                <p>Your download link has been generated successfully. Click the button to save the file to your device.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex justify-center gap-6 mt-6 text-[#8E918F] text-sm">
-                    <span className="flex items-center gap-2"><Youtube className="w-4 h-4" /> YouTube</span>
-                    <span className="flex items-center gap-2"><Facebook className="w-4 h-4" /> Facebook</span>
-                    <span className="flex items-center gap-2"><Instagram className="w-4 h-4" /> Instagram</span>
-                </div>
-            </form>
+            )}
         </Card>
 
         {error && (
             <div className="bg-[#370007] border border-[#F2B8B5]/20 text-[#FFB4AB] p-4 rounded-xl flex items-center gap-3 mb-8 animate-fadeIn">
                 <AlertCircle className="w-5 h-5 flex-shrink-0" />
                 {error}
-            </div>
-        )}
-
-        {result && (
-            <div className="animate-slideUp">
-                <Card className="p-6 bg-[#131314] border border-[#444746] overflow-hidden">
-                    <div className="flex flex-col md:flex-row gap-6">
-                        <div className="w-full md:w-64 flex-shrink-0">
-                            <div className="aspect-video rounded-xl overflow-hidden relative group">
-                                <img src={result.thumbnail} alt="Video Thumbnail" className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                    <Video className="w-8 h-8 text-white opacity-80" />
-                                </div>
-                                <div className="absolute bottom-2 right-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                                    {result.duration}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Badge color="blue">{result.source}</Badge>
-                                <span className="text-[#6DD58C] text-xs font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Ready</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-[#E3E3E3] mb-6 line-clamp-2">{result.title}</h3>
-                            
-                            <div className="space-y-3">
-                                <p className="text-sm text-[#8E918F] font-medium uppercase tracking-wider mb-2">Select Quality</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {result.formats.map((format: any, idx: number) => (
-                                        <button 
-                                            key={idx}
-                                            onClick={() => simulateDownload(format)}
-                                            className="flex items-center justify-between p-3 rounded-lg border border-[#444746] bg-[#1E1F20] hover:bg-[#2D2E30] hover:border-[#6DD58C] transition-all group"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2 rounded ${format.type === 'mp3' ? 'bg-[#9B72CB]/20 text-[#9B72CB]' : 'bg-[#6DD58C]/20 text-[#6DD58C]'}`}>
-                                                    {format.type === 'mp3' ? 'MP3' : 'MP4'}
-                                                </div>
-                                                <div className="text-left">
-                                                    <div className="text-[#E3E3E3] font-medium text-sm">{format.quality}</div>
-                                                    <div className="text-[#8E918F] text-xs">{format.size}</div>
-                                                </div>
-                                            </div>
-                                            <Download className="w-4 h-4 text-[#8E918F] group-hover:text-[#E3E3E3]" />
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </Card>
             </div>
         )}
 
