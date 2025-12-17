@@ -77,39 +77,40 @@ export const Marketplace: React.FC = () => {
     }
 
     if (product.price > 0) {
+         // Check if Paystack script is loaded
          const PaystackPop = (window as any).PaystackPop;
+         
          if (!PaystackPop) {
-             alert("Payment system is loading, please try again in a moment. Check your internet connection.");
+             alert("Paystack payment system is not loaded yet. Please check your internet connection and refresh the page.");
              return;
          }
 
-         try {
-             const handler = PaystackPop.setup({
-                 key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11', // Explicitly set public key
-                 email: currentUser.email,
-                 amount: product.price * 100, // Amount in kobo
-                 currency: 'NGN',
-                 ref: ''+Math.floor((Math.random() * 1000000000) + 1),
-                 callback: async function(response: any) {
-                     await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
-                     await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
-                     
-                     // Refresh user state to reflect purchase immediately
-                     const updatedUser = getCurrentUser();
-                     setUser(updatedUser);
+         const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; // Your Key
 
-                     alert("Payment successful! Downloading your file...");
-                     handleDownload(product);
-                 },
-                 onClose: function() {
-                     alert('Transaction was not completed.');
-                 },
-             });
-             handler.openIframe();
-         } catch (error) {
-             console.error("Paystack Error:", error);
-             alert("An error occurred initializing payment. Please try again.");
-         }
+         const handler = PaystackPop.setup({
+             key: paystackKey,
+             email: currentUser.email,
+             amount: Math.ceil(product.price * 100), // Ensure integer (kobo)
+             currency: 'NGN',
+             ref: '' + Math.floor((Math.random() * 1000000000) + 1), // Generate a random reference number
+             callback: async function(response: any) {
+                 // Payment success
+                 await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
+                 await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
+                 
+                 // Refresh user state to reflect purchase immediately
+                 const updatedUser = getCurrentUser();
+                 setUser(updatedUser);
+
+                 alert("Payment successful! Downloading your file...");
+                 handleDownload(product);
+             },
+             onClose: function() {
+                 alert('Transaction was cancelled.');
+             },
+         });
+         
+         handler.openIframe();
     } else {
          // Free product logic
          handleDownload(product);

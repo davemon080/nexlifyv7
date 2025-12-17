@@ -59,15 +59,17 @@ export const CourseDetail: React.FC = () => {
         // Trigger Paystack
         const PaystackPop = (window as any).PaystackPop;
         if (!PaystackPop) {
-            alert("Payment system is loading, please try again in a moment.");
+            alert("Payment system is loading or blocked by adblocker. Please refresh and try again.");
             setEnrolling(false);
             return;
         }
 
+        const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; // Your Key
+
         const handler = PaystackPop.setup({
-            key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11',
+            key: paystackKey,
             email: user.email,
-            amount: course.price * 100, // Amount in kobo
+            amount: Math.ceil(course.price * 100), // Amount in kobo
             currency: 'NGN',
             ref: ''+Math.floor((Math.random() * 1000000000) + 1),
             callback: function(response: any) {
@@ -75,7 +77,7 @@ export const CourseDetail: React.FC = () => {
                 completeEnrollment(response.reference);
             },
             onClose: function() {
-                alert('Transaction was not completed, window closed.');
+                alert('Transaction was cancelled.');
                 setEnrolling(false);
             },
         });
