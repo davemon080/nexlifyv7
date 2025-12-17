@@ -56,10 +56,9 @@ export const Marketplace: React.FC = () => {
     if(currentUser) logUserActivity(currentUser.id, 'Download', `Downloaded product: ${product.title}`, 'info');
 
     if (product.downloadUrl) {
-      // Create a temporary link to download the file (which is a data URI)
       const link = document.createElement('a');
       link.href = product.downloadUrl;
-      link.download = `${product.title.replace(/\s+/g, '_')}${product.category === 'Ebook' ? '.pdf' : '.zip'}`; // Guess extension based on category
+      link.download = `${product.title.replace(/\s+/g, '_')}${product.category === 'Ebook' ? '.pdf' : '.zip'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -69,7 +68,6 @@ export const Marketplace: React.FC = () => {
   };
 
   const handlePurchase = (product: Product, e?: React.MouseEvent) => {
-    // Prevent event bubbling if clicked inside a card
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -82,7 +80,16 @@ export const Marketplace: React.FC = () => {
         return;
     }
 
+    if (!currentUser.email) {
+        alert("User email is missing. Please update your profile.");
+        return;
+    }
+
     const price = Number(product.price);
+    if (isNaN(price)) {
+        alert("Invalid product price data.");
+        return;
+    }
 
     if (price > 0) {
          // Check if Paystack script is loaded
@@ -93,35 +100,29 @@ export const Marketplace: React.FC = () => {
              return;
          }
 
-         const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; // Explicit Key
-
-         console.log("Initializing Paystack Payment:", {
-             email: currentUser.email,
-             amount: price,
-             key: paystackKey
-         });
+         const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; 
 
          try {
+             console.log("Initializing Paystack for:", currentUser.email, price);
+             
              const handler = PaystackPop.setup({
                  key: paystackKey,
                  email: currentUser.email,
                  amount: Math.ceil(price * 100), // Amount in kobo
                  currency: 'NGN',
-                 ref: '' + Math.floor((Math.random() * 1000000000) + 1), // Generate a random reference number
+                 ref: `nex-prod-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, // Unique reference
                  callback: async function(response: any) {
-                     // Payment success
-                     console.log("Payment complete", response);
+                     console.log("Payment success:", response);
                      await recordTransaction(currentUser.id, 'product_purchase', product.id, price, response.reference);
                      await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${price}`, 'success');
                      
-                     // Refresh user state to reflect purchase immediately
+                     // Refresh user state
                      const updatedUser = getCurrentUser();
                      setUser(updatedUser);
 
                      alert("Payment successful! Downloading your file...");
                      handleDownload(product);
                      
-                     // If modal was open, close it now
                      if (previewProduct && previewProduct.id === product.id) {
                          setPreviewProduct(null);
                      }
@@ -131,13 +132,17 @@ export const Marketplace: React.FC = () => {
                  },
              });
              
+             if (!handler) {
+                 throw new Error("Paystack handler could not be initialized.");
+             }
+
              handler.openIframe();
-         } catch (err) {
-             console.error("Paystack setup error:", err);
-             alert("Could not initialize payment. Please try again.");
+
+         } catch (err: any) {
+             console.error("Paystack Error:", err);
+             alert(`Payment Error: ${err.message || 'Could not start payment flow'}`);
          }
     } else {
-         // Free product logic
          handleDownload(product);
          if (previewProduct && previewProduct.id === product.id) {
              setPreviewProduct(null);
@@ -147,7 +152,6 @@ export const Marketplace: React.FC = () => {
 
   const handleShare = async (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
-    // Simulate a deep link
     const url = `${window.location.origin}${window.location.pathname}#/market?product=${product.id}`;
     
     if (navigator.share) {

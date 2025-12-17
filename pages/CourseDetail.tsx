@@ -36,6 +36,11 @@ export const CourseDetail: React.FC = () => {
         return;
     }
 
+    if (!user.email) {
+        alert("Please update your profile with a valid email address before enrolling.");
+        return;
+    }
+
     setEnrolling(true);
 
     const completeEnrollment = async (reference?: string) => {
@@ -64,24 +69,29 @@ export const CourseDetail: React.FC = () => {
             return;
         }
 
-        const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; // Your Key
+        const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11';
 
-        const handler = PaystackPop.setup({
-            key: paystackKey,
-            email: user.email,
-            amount: Math.ceil(course.price * 100), // Amount in kobo
-            currency: 'NGN',
-            ref: ''+Math.floor((Math.random() * 1000000000) + 1),
-            callback: function(response: any) {
-                // Payment complete
-                completeEnrollment(response.reference);
-            },
-            onClose: function() {
-                alert('Transaction was cancelled.');
-                setEnrolling(false);
-            },
-        });
-        handler.openIframe();
+        try {
+            const handler = PaystackPop.setup({
+                key: paystackKey,
+                email: user.email,
+                amount: Math.ceil(course.price * 100), // Amount in kobo
+                currency: 'NGN',
+                ref: `nex-course-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+                callback: function(response: any) {
+                    completeEnrollment(response.reference);
+                },
+                onClose: function() {
+                    alert('Transaction was cancelled.');
+                    setEnrolling(false);
+                },
+            });
+            handler.openIframe();
+        } catch (error: any) {
+            console.error("Paystack Init Error", error);
+            alert("Could not initialize payment: " + (error.message || "Unknown error"));
+            setEnrolling(false);
+        }
 
     } else {
         // Free Course
