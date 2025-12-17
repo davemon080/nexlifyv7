@@ -26,6 +26,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = req.query.action as string;
     const body = req.body || {};
 
+    // --- APP SETTINGS ---
+    if (action === 'getAppSettings') {
+        const { rows } = await pool.query('SELECT platform_name, logo_url FROM app_settings WHERE id = 1');
+        if (rows.length > 0) {
+            return res.status(200).json({ 
+                platformName: rows[0].platform_name, 
+                logoUrl: rows[0].logo_url 
+            });
+        }
+        return res.status(200).json({ platformName: 'Nexlify' });
+    }
+
+    if (action === 'updateAppSettings') {
+        const { platformName, logoUrl } = body;
+        // Upsert (Update if exists, Insert if not - though logic assumes row 1 exists from init)
+        await pool.query(
+            `INSERT INTO app_settings (id, platform_name, logo_url) 
+             VALUES (1, $1, $2) 
+             ON CONFLICT (id) DO UPDATE 
+             SET platform_name = EXCLUDED.platform_name, logo_url = EXCLUDED.logo_url`,
+            [platformName, logoUrl]
+        );
+        return res.status(200).json({ success: true });
+    }
+
     // --- AUTHENTICATION ---
 
     if (action === 'googleAuth') {
@@ -43,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const googleData = await googleRes.json();
-      const { sub, name, email } = googleData;
+      const { sub, name, email, picture } = googleData;
 
       // Check if user exists
       const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -52,6 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const user = rows[0];
           if (user.status === 'suspended' || user.status === 'banned') {
               return res.status(403).json({ error: 'Account suspended' });
+          }
+          
+          // Update photo if changed/missing
+          if (picture && user.photo_url !== picture) {
+               await pool.query('UPDATE users SET photo_url = $1 WHERE id = $2', [picture, user.id]);
+               user.photo_url = picture;
           }
           
           // Fetch enrollments
@@ -65,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               role: user.role,
               balance: parseFloat(user.balance),
               status: user.status,
+              photoUrl: user.photo_url,
               joinedAt: user.created_at,
               enrolledCourses
           });
@@ -72,8 +104,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Register new user automatically
           const newId = `u-${sub.substring(0, 10)}${Date.now().toString().substring(8)}`;
           await pool.query(
-              'INSERT INTO users (id, name, email, password, role, balance, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-              [newId, name, email, 'google-oauth-user', 'user', 0, 'active']
+              'INSERT INTO users (id, name, email, password, role, balance, status, photo_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+              [newId, name, email, 'google-oauth-user', 'user', 0, 'active', picture]
           );
           
           return res.status(200).json({
@@ -83,6 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               role: 'user',
               balance: 0,
               status: 'active',
+              photoUrl: picture,
               joinedAt: new Date().toISOString(),
               enrolledCourses: []
           });
@@ -113,6 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         role: user.role,
         balance: parseFloat(user.balance),
         status: user.status,
+        photoUrl: user.photo_url,
         joinedAt: user.created_at,
         enrolledCourses
       });
@@ -122,13 +156,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { id, name, email, password, role, adminSecret } = body;
       
       // SERVER-SIDE SECURITY CHECK
-      // Check if the requested role is admin, and if the provided secret matches the server env var
       let finalRole = 'user';
       if (role === 'admin') {
           if (process.env.ADMIN_SECRET && adminSecret === process.env.ADMIN_SECRET) {
               finalRole = 'admin';
           } else {
-              // If secret is wrong or missing, force user role
               finalRole = 'user'; 
           }
       }
@@ -142,7 +174,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           id, name, email, role: finalRole, balance: 0, status: 'active', enrolledCourses: []
         });
       } catch (e: any) {
-        // Postgres unique violation code is 23505
         if (e.code === '23505') return res.status(400).json({ error: 'Email already exists' });
         console.error("Register error:", e);
         throw e;
@@ -151,8 +182,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'changePassword') {
         const { userId, currentPassword, newPassword } = body;
-        
-        // Verify current password
         const { rows } = await pool.query('SELECT password FROM users WHERE id = $1', [userId]);
         if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
         
@@ -160,14 +189,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Incorrect current password' });
         }
 
-        // Update password
         await pool.query('UPDATE users SET password = $1 WHERE id = $2', [newPassword, userId]);
         return res.status(200).json({ success: true });
     }
 
     // --- PRODUCTS ---
     if (action === 'getProducts') {
-      // Postgres returns column names as is. We map snake_case db columns to camelCase API response if needed.
       const { rows } = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
       const mapped = rows.map((p: any) => ({
         id: p.id,
@@ -218,6 +245,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         role: u.role,
         balance: parseFloat(u.balance),
         status: u.status,
+        photoUrl: u.photo_url,
         joinedAt: u.created_at,
         enrolledCourses: [] 
       }));
@@ -225,10 +253,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'updateUser') {
-      const { id, name, email, role, balance, status } = body;
+      const { id, name, email, role, balance, status, photoUrl } = body;
       await pool.query(
-        'UPDATE users SET name=$1, email=$2, role=$3, balance=$4, status=$5 WHERE id=$6',
-        [name, email, role, balance, status, id]
+        'UPDATE users SET name=$1, email=$2, role=$3, balance=$4, status=$5, photo_url=$6 WHERE id=$7',
+        [name, email, role, balance, status, photoUrl, id]
       );
       return res.status(200).json({ success: true });
     }
@@ -268,7 +296,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'getCourses') {
       const { rows } = await pool.query('SELECT * FROM courses');
       const mapped = rows.map((c: any) => {
-        // Postgres JSONB columns are automatically parsed into objects by the driver
         const modules = c.modules_json || [];
         return {
             ...c,
@@ -297,7 +324,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'addCourse') {
         const { id, title, description, thumbnail, level, duration, instructor, price, modules } = body;
-        // Store modules as JSONB
         await pool.query(
             'INSERT INTO courses (id, title, description, thumbnail, level, duration, instructor, price, modules_json) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
             [id, title, description, thumbnail, level, duration, instructor, price, JSON.stringify(modules)]
@@ -316,7 +342,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'deleteCourse') {
         const { id } = body;
-        // Cascading deletes handled by DB constraints usually, but good to be explicit
         await pool.query('DELETE FROM enrollments WHERE course_id = $1', [id]);
         await pool.query('DELETE FROM courses WHERE id = $1', [id]);
         return res.status(200).json({ success: true });
@@ -324,7 +349,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'enroll') {
         const { userId, courseId } = body;
-        // Postgres equivalent of INSERT IGNORE is ON CONFLICT DO NOTHING
         await pool.query(
             'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
             [userId, courseId]

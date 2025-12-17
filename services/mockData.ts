@@ -46,16 +46,36 @@ export const isCloudEnabled = () => true;
 
 // --- APP SETTINGS ---
 export const getAppSettings = (): AppSettings => {
+    // We try to fetch from API, but this function is often called synchronously during render.
+    // For React simplicity, we rely on LocalStorage as a cache, which is updated by the async fetch.
+    
+    // Trigger async refresh
+    api<AppSettings>('getAppSettings').then(settings => {
+        const current = localStorage.getItem('appSettings');
+        if (current !== JSON.stringify(settings)) {
+            localStorage.setItem('appSettings', JSON.stringify(settings));
+            window.dispatchEvent(new Event('appSettingsChanged'));
+        }
+    }).catch(() => {});
+
+    // Return current cached value
     try {
         const stored = localStorage.getItem('appSettings');
         return stored ? JSON.parse(stored) : { platformName: 'Nexlify' };
     } catch { return { platformName: 'Nexlify' }; }
 };
 
-export const updateAppSettings = (settings: AppSettings) => {
-    localStorage.setItem('appSettings', JSON.stringify(settings));
-    // Dispatch event so other components (like Navbar) can update immediately
-    window.dispatchEvent(new Event('appSettingsChanged'));
+export const updateAppSettings = async (settings: AppSettings) => {
+    try {
+        await api('updateAppSettings', 'POST', settings);
+        // Update local cache
+        localStorage.setItem('appSettings', JSON.stringify(settings));
+        window.dispatchEvent(new Event('appSettingsChanged'));
+    } catch (e) {
+        console.warn("Failed to save settings to DB, using local fallback");
+        localStorage.setItem('appSettings', JSON.stringify(settings));
+        window.dispatchEvent(new Event('appSettingsChanged'));
+    }
 };
 
 // --- INITIALIZATION ---

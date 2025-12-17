@@ -29,8 +29,19 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT DEFAULT 'user',
   balance DECIMAL(10, 2) DEFAULT 0,
   status TEXT DEFAULT 'active',
+  photo_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- App Settings Table (Singleton Configuration)
+CREATE TABLE IF NOT EXISTS app_settings (
+  id INT PRIMARY KEY DEFAULT 1,
+  platform_name TEXT DEFAULT 'Nexlify',
+  logo_url TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- Initialize Default Settings
+INSERT INTO app_settings (id, platform_name) VALUES (1, 'Nexlify') ON CONFLICT (id) DO NOTHING;
 
 -- Products Table
 CREATE TABLE IF NOT EXISTS products (
