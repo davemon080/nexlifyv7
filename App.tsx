@@ -20,6 +20,8 @@ import { ImageAnalyzer } from './pages/ImageAnalyzer';
 import { VideoAnalyzer } from './pages/VideoAnalyzer';
 import { AudioTranscribe } from './pages/AudioTranscribe';
 import { TextToSpeech } from './pages/TextToSpeech';
+import { FileHosting } from './pages/FileHosting';
+import { TemplateViewer } from './pages/TemplateViewer';
 import { ScrollToTop } from './components/ScrollToTop';
 import { initializeDatabase } from './services/mockData';
 
@@ -32,32 +34,40 @@ const App: React.FC = () => {
   return (
     <Router>
       <ScrollToTop />
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/market" element={<Marketplace />} />
-          
-          {/* AI Tools Routes */}
-          <Route path="/ai-tools" element={<AiTools />} />
-          <Route path="/ai-tools/downloader" element={<VideoDownloader />} />
-          <Route path="/ai-tools/transcribe" element={<VideoTranscribe />} />
-          <Route path="/ai-tools/chat" element={<AiChat />} />
-          <Route path="/ai-tools/image" element={<ImageAnalyzer />} />
-          <Route path="/ai-tools/video" element={<VideoAnalyzer />} />
-          <Route path="/ai-tools/audio" element={<AudioTranscribe />} />
-          <Route path="/ai-tools/tts" element={<TextToSpeech />} />
+      <Routes>
+        {/* Template Viewer needs to be outside Layout to full screen iframe */}
+        <Route path="/template-view/:id" element={<TemplateViewer />} />
+        
+        <Route path="*" element={
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/market" element={<Marketplace />} />
+              
+              {/* AI Tools Routes */}
+              <Route path="/ai-tools" element={<AiTools />} />
+              <Route path="/ai-tools/downloader" element={<VideoDownloader />} />
+              <Route path="/ai-tools/transcribe" element={<VideoTranscribe />} />
+              <Route path="/ai-tools/chat" element={<AiChat />} />
+              <Route path="/ai-tools/image" element={<ImageAnalyzer />} />
+              <Route path="/ai-tools/video" element={<VideoAnalyzer />} />
+              <Route path="/ai-tools/audio" element={<AudioTranscribe />} />
+              <Route path="/ai-tools/tts" element={<TextToSpeech />} />
 
-          <Route path="/hire" element={<Hire />} />
-          <Route path="/earn" element={<Earn />} />
-          <Route path="/training" element={<Training />} />
-          <Route path="/training/:id" element={<CourseDetail />} />
-          <Route path="/classroom/:id" element={<Classroom />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/profile" element={<Profile />} />
-        </Routes>
-      </Layout>
+              <Route path="/hire" element={<Hire />} />
+              <Route path="/earn" element={<Earn />} />
+              <Route path="/training" element={<Training />} />
+              <Route path="/training/:id" element={<CourseDetail />} />
+              <Route path="/classroom/:id" element={<Classroom />} />
+              <Route path="/admin" element={<Admin />} />
+              <Route path="/admin/hosting" element={<FileHosting />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/profile" element={<Profile />} />
+            </Routes>
+          </Layout>
+        } />
+      </Routes>
     </Router>
   );
 };

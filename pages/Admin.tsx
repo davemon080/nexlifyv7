@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings, getAdminStats, deleteInquiry, adminRevokeAccess } from '../services/mockData';
 import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion, AppSettings, PageSeoConfig } from '../types';
 import { Button, Input, Card, Badge, Textarea } from '../components/UI';
-import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, GripVertical, Gift, Settings, Save, BarChart3, TrendingUp, Globe, Eye, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, GripVertical, Gift, Settings, Save, BarChart3, TrendingUp, Globe, Eye, BookOpen, Cloud } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -522,6 +522,10 @@ export const Admin: React.FC = () => {
                 </button>
                 <button onClick={() => setActiveTab('settings')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
                     <Settings className="w-4 h-4 mr-2" /> Settings
+                </button>
+                {/* NEW HOSTING BUTTON */}
+                <button onClick={() => navigate('/admin/hosting')} className="flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap text-[#C4C7C5] hover:bg-[#444746] hover:text-[#A8C7FA]">
+                    <Cloud className="w-4 h-4 mr-2" /> Hosting
                 </button>
             </div>
           </div>

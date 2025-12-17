@@ -26,6 +26,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = req.query.action as string;
     const body = req.body || {};
 
+    // --- HOSTING / FILES ---
+    if (action === 'getHostedFiles') {
+        // Create table if not exists (Lazy init for this feature)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hosted_files (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                mime_type TEXT,
+                content TEXT, 
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        const { rows } = await pool.query('SELECT id, name, mime_type, created_at FROM hosted_files ORDER BY created_at DESC');
+        return res.status(200).json(rows);
+    }
+
+    if (action === 'uploadHostedFile') {
+        const { id, name, mimeType, content } = body;
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS hosted_files (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                mime_type TEXT,
+                content TEXT, 
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(
+            'INSERT INTO hosted_files (id, name, mime_type, content) VALUES ($1, $2, $3, $4)',
+            [id, name, mimeType, content]
+        );
+        return res.status(200).json({ success: true });
+    }
+
+    if (action === 'deleteHostedFile') {
+        const { id } = body;
+        await pool.query('DELETE FROM hosted_files WHERE id = $1', [id]);
+        return res.status(200).json({ success: true });
+    }
+
+    if (action === 'getFileContent') {
+        const id = req.query.id;
+        const { rows } = await pool.query('SELECT content, mime_type FROM hosted_files WHERE id = $1', [id]);
+        if (rows.length === 0) return res.status(404).json({ error: 'File not found' });
+        return res.status(200).json(rows[0]);
+    }
+
     // --- APP SETTINGS ---
     if (action === 'getAppSettings') {
         const { rows } = await pool.query('SELECT platform_name, logo_url FROM app_settings WHERE id = 1');

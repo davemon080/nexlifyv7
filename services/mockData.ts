@@ -44,6 +44,62 @@ const setLocal = (key: string, data: any[]) => {
 
 export const isCloudEnabled = () => true;
 
+// --- HOSTING SERVICES ---
+
+export interface HostedFile {
+    id: string;
+    name: string;
+    mime_type: string;
+    created_at: string;
+    content?: string; // Only present when fetching specific file
+}
+
+export const getHostedFiles = async (): Promise<HostedFile[]> => {
+    try {
+        return await api<HostedFile[]>('getHostedFiles');
+    } catch {
+        return getLocal<HostedFile>('hosted_files');
+    }
+};
+
+export const uploadHostedFile = async (name: string, mimeType: string, content: string): Promise<HostedFile> => {
+    const id = `file-${Date.now()}-${Math.random().toString(36).substr(2,5)}`;
+    const newFile = { id, name, mimeType, content, created_at: new Date().toISOString() };
+    
+    try {
+        await api('uploadHostedFile', 'POST', { id, name, mimeType, content });
+        return { ...newFile, mime_type: mimeType };
+    } catch {
+        const files = getLocal<HostedFile>('hosted_files');
+        const localFile = { id, name, mime_type: mimeType, content, created_at: new Date().toISOString() };
+        files.unshift(localFile);
+        setLocal('hosted_files', files);
+        return localFile;
+    }
+};
+
+export const deleteHostedFile = async (id: string): Promise<void> => {
+    try {
+        await api('deleteHostedFile', 'POST', { id });
+    } catch {
+        const files = getLocal<HostedFile>('hosted_files');
+        setLocal('hosted_files', files.filter(f => f.id !== id));
+    }
+};
+
+export const getFileContent = async (id: string): Promise<{content: string, mime_type: string} | null> => {
+    try {
+        const res = await fetch(`${API_URL}?action=getFileContent&id=${id}`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch {
+        const files = getLocal<HostedFile>('hosted_files');
+        const file = files.find(f => f.id === id);
+        if (!file || !file.content) return null;
+        return { content: file.content, mime_type: file.mime_type };
+    }
+};
+
 // --- APP SETTINGS ---
 export const getAppSettings = (): AppSettings => {
     // We try to fetch from API, but this function is often called synchronously during render.
