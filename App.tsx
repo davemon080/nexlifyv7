@@ -12,6 +12,7 @@ import { Training } from './pages/Training';
 import { CourseDetail } from './pages/CourseDetail';
 import { Classroom } from './pages/Classroom';
 import { Profile } from './pages/Profile';
+import { AiTools } from './pages/AiTools';
 import { ScrollToTop } from './components/ScrollToTop';
 import { initializeDatabase } from './services/mockData';
 
@@ -28,6 +29,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/market" element={<Marketplace />} />
+          <Route path="/ai-tools" element={<AiTools />} />
           <Route path="/hire" element={<Hire />} />
           <Route path="/earn" element={<Earn />} />
           <Route path="/training" element={<Training />} />

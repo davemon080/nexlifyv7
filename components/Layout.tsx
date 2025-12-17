@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, ShoppingBag, Briefcase, DollarSign, LayoutDashboard, Home, Sparkles, GraduationCap, User as UserIcon, Cloud, CloudOff } from 'lucide-react';
+import { Menu, X, ShoppingBag, Briefcase, DollarSign, LayoutDashboard, Home, Sparkles, GraduationCap, User as UserIcon, Cloud, CloudOff, Bot } from 'lucide-react';
 import { Button } from './UI';
 import { isCloudEnabled, getAppSettings } from '../services/mockData';
 import { AppSettings } from '../types';
@@ -34,6 +34,7 @@ export const Navbar: React.FC = () => {
     { name: 'Home', path: '/', icon: Home },
     { name: 'Training', path: '/training', icon: GraduationCap },
     { name: 'Marketplace', path: '/market', icon: ShoppingBag },
+    { name: 'AI Tools', path: '/ai-tools', icon: Bot },
     { name: 'Hire Talent', path: '/hire', icon: Briefcase },
     { name: 'Earn', path: '/earn', icon: DollarSign },
   ];
@@ -192,6 +193,7 @@ export const Footer: React.FC = () => {
             <ul className="space-y-4">
               <li><Link to="/training" className="hover:text-[#A8C7FA] transition-colors">Training</Link></li>
               <li><Link to="/market" className="hover:text-[#A8C7FA] transition-colors">Marketplace</Link></li>
+              <li><Link to="/ai-tools" className="hover:text-[#A8C7FA] transition-colors">AI Tools</Link></li>
               <li><Link to="/hire" className="hover:text-[#A8C7FA] transition-colors">Hire Talent</Link></li>
               <li><Link to="/earn" className="hover:text-[#A8C7FA] transition-colors">Earn Money</Link></li>
             </ul>
