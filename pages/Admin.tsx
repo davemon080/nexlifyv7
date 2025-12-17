@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser } from '../services/mockData';
-import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson } from '../types';
+import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion } from '../types';
 import { Button, Input, Card, Badge, Textarea } from '../components/UI';
-import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift } from 'lucide-react';
+import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -250,7 +250,8 @@ export const Admin: React.FC = () => {
           title: 'New Lesson',
           type: 'text',
           content: '',
-          duration: '10 mins'
+          duration: '10 mins',
+          questions: []
       };
       const updatedModules = [...(currentCourse.modules || [])];
       updatedModules[moduleIdx].lessons.push(newLesson);
@@ -270,6 +271,57 @@ export const Admin: React.FC = () => {
           [field]: value 
       };
       setCurrentCourse({ ...currentCourse, modules: updatedModules });
+  };
+
+  const handleLessonFileUpload = (moduleIdx: number, lessonIdx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+               handleUpdateLesson(moduleIdx, lessonIdx, 'fileUrl', reader.result as string);
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
+  // Quiz Management
+  const handleAddQuestion = (moduleIdx: number, lessonIdx: number) => {
+      const updatedModules = [...(currentCourse.modules || [])];
+      const lesson = updatedModules[moduleIdx].lessons[lessonIdx];
+      const newQuestion: QuizQuestion = {
+          id: `q-${Date.now()}`,
+          question: 'New Question?',
+          options: ['Option A', 'Option B', 'Option C', 'Option D'],
+          correctAnswer: 0
+      };
+      lesson.questions = [...(lesson.questions || []), newQuestion];
+      setCurrentCourse({ ...currentCourse, modules: updatedModules });
+  };
+
+  const handleUpdateQuestion = (moduleIdx: number, lessonIdx: number, qIdx: number, field: keyof QuizQuestion, value: any) => {
+      const updatedModules = [...(currentCourse.modules || [])];
+      const questions = [...(updatedModules[moduleIdx].lessons[lessonIdx].questions || [])];
+      questions[qIdx] = { ...questions[qIdx], [field]: value };
+      updatedModules[moduleIdx].lessons[lessonIdx].questions = questions;
+      setCurrentCourse({ ...currentCourse, modules: updatedModules });
+  };
+  
+  const handleUpdateOption = (moduleIdx: number, lessonIdx: number, qIdx: number, optIdx: number, value: string) => {
+        const updatedModules = [...(currentCourse.modules || [])];
+        const questions = [...(updatedModules[moduleIdx].lessons[lessonIdx].questions || [])];
+        const options = [...questions[qIdx].options];
+        options[optIdx] = value;
+        questions[qIdx].options = options;
+        updatedModules[moduleIdx].lessons[lessonIdx].questions = questions;
+        setCurrentCourse({ ...currentCourse, modules: updatedModules });
+  };
+
+  const handleDeleteQuestion = (moduleIdx: number, lessonIdx: number, qIdx: number) => {
+        const updatedModules = [...(currentCourse.modules || [])];
+        const questions = [...(updatedModules[moduleIdx].lessons[lessonIdx].questions || [])];
+        questions.splice(qIdx, 1);
+        updatedModules[moduleIdx].lessons[lessonIdx].questions = questions;
+        setCurrentCourse({ ...currentCourse, modules: updatedModules });
   };
 
   const handleSaveCourse = async () => {
@@ -808,26 +860,87 @@ export const Admin: React.FC = () => {
                                                         <button onClick={() => handleDeleteLesson(mIdx, lIdx)} className="text-[#CF6679] opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>
                                                     </div>
                                                     
-                                                    {lesson.type === 'video' ? (
+                                                    {lesson.type === 'video' && (
                                                         <div className="flex items-center gap-2">
                                                             <Video className="w-4 h-4 text-[#8E918F]" />
                                                             <input 
                                                                 className="bg-[#131314] border border-[#444746] rounded-lg px-3 py-2 text-xs w-full text-[#C4C7C5] outline-none focus:border-[#A8C7FA]"
                                                                 value={lesson.content} 
                                                                 onChange={e => handleUpdateLesson(mIdx, lIdx, 'content', e.target.value)}
-                                                                placeholder="Paste YouTube Embed URL here..." 
+                                                                placeholder="Paste YouTube Link (e.g. youtube.com/watch?v=...)" 
                                                             />
                                                         </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-2">
-                                                            <FileText className="w-4 h-4 text-[#8E918F]" />
-                                                            <textarea 
-                                                                className="bg-[#131314] border border-[#444746] rounded-lg px-3 py-2 text-xs w-full text-[#C4C7C5] outline-none focus:border-[#A8C7FA]"
-                                                                value={lesson.content} 
-                                                                onChange={e => handleUpdateLesson(mIdx, lIdx, 'content', e.target.value)}
-                                                                placeholder="Enter lesson content text..." 
-                                                                rows={2}
-                                                            />
+                                                    )}
+
+                                                    {lesson.type === 'text' && (
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <FileText className="w-4 h-4 text-[#8E918F]" />
+                                                                <textarea 
+                                                                    className="bg-[#131314] border border-[#444746] rounded-lg px-3 py-2 text-xs w-full text-[#C4C7C5] outline-none focus:border-[#A8C7FA]"
+                                                                    value={lesson.content} 
+                                                                    onChange={e => handleUpdateLesson(mIdx, lIdx, 'content', e.target.value)}
+                                                                    placeholder="Enter reading content here..." 
+                                                                    rows={2}
+                                                                />
+                                                            </div>
+                                                            <div className="flex items-center gap-2 ml-6">
+                                                                {lesson.fileUrl ? (
+                                                                    <div className="flex items-center gap-2 text-xs text-[#6DD58C] bg-[#0F5223] px-2 py-1 rounded border border-[#6DD58C]/30">
+                                                                        <Check className="w-3 h-3" /> PDF/Doc Attached
+                                                                        <button onClick={() => handleUpdateLesson(mIdx, lIdx, 'fileUrl', '')}><X className="w-3 h-3 hover:text-white"/></button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <label className="cursor-pointer flex items-center gap-1 text-xs text-[#A8C7FA] hover:underline">
+                                                                        <Upload className="w-3 h-3" /> Upload PDF/Doc
+                                                                        <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={(e) => handleLessonFileUpload(mIdx, lIdx, e)} />
+                                                                    </label>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {lesson.type === 'quiz' && (
+                                                        <div className="mt-2 pl-2 border-l-2 border-[#444746]">
+                                                            <div className="flex justify-between items-center mb-2">
+                                                                <span className="text-xs text-[#8E918F]">Quiz Questions</span>
+                                                                <button onClick={() => handleAddQuestion(mIdx, lIdx)} className="text-xs text-[#A8C7FA] hover:underline">+ Add Question</button>
+                                                            </div>
+                                                            <div className="space-y-4">
+                                                                {lesson.questions?.map((q, qIdx) => (
+                                                                    <div key={q.id} className="bg-[#131314] p-3 rounded-lg border border-[#444746]">
+                                                                        <div className="flex gap-2 mb-2">
+                                                                            <span className="text-xs text-[#8E918F] pt-1">Q{qIdx+1}.</span>
+                                                                            <input 
+                                                                                className="bg-transparent border-b border-[#444746] text-[#E3E3E3] text-sm flex-1 outline-none focus:border-[#A8C7FA]"
+                                                                                value={q.question}
+                                                                                onChange={(e) => handleUpdateQuestion(mIdx, lIdx, qIdx, 'question', e.target.value)}
+                                                                                placeholder="Question Text"
+                                                                            />
+                                                                            <button onClick={() => handleDeleteQuestion(mIdx, lIdx, qIdx)} className="text-[#CF6679] hover:bg-[#CF6679]/10 p-1 rounded"><Trash2 className="w-3 h-3" /></button>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-2 gap-2 ml-4">
+                                                                            {q.options.map((opt, optIdx) => (
+                                                                                <div key={optIdx} className="flex items-center gap-2">
+                                                                                    <input 
+                                                                                        type="radio" 
+                                                                                        name={`correct-${q.id}`} 
+                                                                                        checked={q.correctAnswer === optIdx}
+                                                                                        onChange={() => handleUpdateQuestion(mIdx, lIdx, qIdx, 'correctAnswer', optIdx)}
+                                                                                        className="accent-[#6DD58C]"
+                                                                                    />
+                                                                                    <input 
+                                                                                        className="bg-[#1E1F20] rounded border border-[#444746] text-xs text-[#C4C7C5] px-2 py-1 w-full outline-none focus:border-[#A8C7FA]"
+                                                                                        value={opt}
+                                                                                        onChange={(e) => handleUpdateOption(mIdx, lIdx, qIdx, optIdx, e.target.value)}
+                                                                                        placeholder={`Option ${optIdx + 1}`}
+                                                                                    />
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>

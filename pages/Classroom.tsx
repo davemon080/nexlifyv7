@@ -3,7 +3,31 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getCourseById, getCompletedLessons, saveCompletedLesson } from '../services/mockData';
 import { Course, Module, Lesson } from '../types';
 import { Button, Card, Badge } from '../components/UI';
-import { PlayCircle, CheckCircle, Lock, Menu, FileText, Video, X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { PlayCircle, CheckCircle, Lock, Menu, FileText, Video, X, ChevronRight, ChevronLeft, HelpCircle, Download, ExternalLink } from 'lucide-react';
+
+// Helper to convert standard YouTube links to Embed links
+const getYouTubeEmbedUrl = (url: string) => {
+    if (!url) return '';
+    try {
+        let videoId = '';
+        if (url.includes('youtube.com/watch?v=')) {
+            videoId = url.split('v=')[1];
+            const ampersandPosition = videoId.indexOf('&');
+            if (ampersandPosition !== -1) {
+                videoId = videoId.substring(0, ampersandPosition);
+            }
+        } else if (url.includes('youtu.be/')) {
+            videoId = url.split('youtu.be/')[1];
+        } else if (url.includes('youtube.com/embed/')) {
+            return url; // Already an embed link
+        } else {
+            return url; // Return as is, might be a different provider
+        }
+        return `https://www.youtube.com/embed/${videoId}`;
+    } catch {
+        return url;
+    }
+};
 
 export const Classroom: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +37,11 @@ export const Classroom: React.FC = () => {
   const [activeLesson, setActiveLesson] = useState<Lesson | undefined>(undefined);
   const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
+  
+  // Quiz State
+  const [quizAnswers, setQuizAnswers] = useState<{[key: string]: number}>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
 
   useEffect(() => {
     // Basic check for "enrollment"
@@ -75,9 +104,26 @@ export const Classroom: React.FC = () => {
 
   }, [id, navigate]);
 
+  // Reset quiz state when changing lessons
+  useEffect(() => {
+      setQuizAnswers({});
+      setQuizSubmitted(false);
+      setQuizScore(0);
+  }, [activeLesson]);
+
   const handleMarkComplete = () => {
       if(!course || !activeLesson || !activeModule) return;
       
+      // Validation for Quiz
+      if (activeLesson.type === 'quiz' && !quizSubmitted) {
+          alert("Please take and submit the quiz first.");
+          return;
+      }
+      if (activeLesson.type === 'quiz' && quizScore < 50) {
+          alert("You need to score at least 50% to pass this lesson.");
+          return;
+      }
+
       // 1. Save Progress
       saveCompletedLesson(course.id, activeLesson.id);
       if(!completedLessonIds.includes(activeLesson.id)) {
@@ -131,6 +177,28 @@ export const Classroom: React.FC = () => {
                   setActiveLesson(prevModule.lessons[prevModule.lessons.length - 1]);
               }
           }
+      }
+  };
+
+  const submitQuiz = () => {
+      if (!activeLesson?.questions) return;
+      
+      let correct = 0;
+      activeLesson.questions.forEach((q) => {
+          if (quizAnswers[q.id] === q.correctAnswer) {
+              correct++;
+          }
+      });
+      
+      const score = (correct / activeLesson.questions.length) * 100;
+      setQuizScore(score);
+      setQuizSubmitted(true);
+      
+      if (score >= 50) {
+           saveCompletedLesson(course!.id, activeLesson.id);
+           if(!completedLessonIds.includes(activeLesson.id)) {
+              setCompletedLessonIds([...completedLessonIds, activeLesson.id]);
+           }
       }
   };
 
@@ -196,7 +264,9 @@ export const Classroom: React.FC = () => {
                           {isCompleted(lesson.id) ? (
                               <CheckCircle className="w-4 h-4 text-[#6DD58C]" />
                           ) : (
-                              lesson.type === 'video' ? <Video className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} /> : <FileText className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} />
+                              lesson.type === 'video' ? <Video className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} /> : 
+                              lesson.type === 'quiz' ? <HelpCircle className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} /> :
+                              <FileText className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} />
                           )}
                       </div>
                       <span className={`leading-snug ${activeLesson.id === lesson.id ? 'text-[#A8C7FA] font-medium' : isCompleted(lesson.id) ? 'text-[#C4C7C5] line-through decoration-[#5E5E5E]' : 'text-[#8E918F]'}`}>
@@ -233,22 +303,112 @@ export const Classroom: React.FC = () => {
                     <iframe 
                         width="100%" 
                         height="100%" 
-                        src={activeLesson.content} 
+                        src={getYouTubeEmbedUrl(activeLesson.content)} 
                         title="Video player" 
                         frameBorder="0" 
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                         allowFullScreen
                     ></iframe>
                 </div>
+            ) : activeLesson.type === 'quiz' ? (
+                <Card className="p-6 md:p-8 mb-6 md:mb-8">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl md:text-2xl font-bold text-[#E3E3E3]">{activeLesson.title}</h2>
+                        {quizSubmitted && (
+                            <Badge color={quizScore >= 50 ? 'green' : 'red'}>
+                                Score: {quizScore.toFixed(0)}%
+                            </Badge>
+                        )}
+                    </div>
+                    
+                    {!activeLesson.questions || activeLesson.questions.length === 0 ? (
+                        <p className="text-[#8E918F]">No questions in this quiz.</p>
+                    ) : (
+                        <div className="space-y-8">
+                            {activeLesson.questions.map((q, idx) => {
+                                const isCorrect = quizSubmitted && quizAnswers[q.id] === q.correctAnswer;
+                                const isWrong = quizSubmitted && quizAnswers[q.id] !== undefined && quizAnswers[q.id] !== q.correctAnswer;
+                                
+                                return (
+                                    <div key={q.id} className={`p-4 rounded-xl border ${isCorrect ? 'border-[#6DD58C]/50 bg-[#0F5223]/20' : isWrong ? 'border-[#CF6679]/50 bg-[#370007]/20' : 'border-[#444746] bg-[#1E1F20]'}`}>
+                                        <p className="text-[#E3E3E3] font-medium mb-3">{idx + 1}. {q.question}</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {q.options.map((opt, optIdx) => (
+                                                <label 
+                                                    key={optIdx} 
+                                                    className={`
+                                                        flex items-center p-3 rounded-lg border cursor-pointer transition-colors
+                                                        ${quizSubmitted 
+                                                            ? (optIdx === q.correctAnswer ? 'border-[#6DD58C] bg-[#6DD58C]/10 text-[#C4EED0]' : (quizAnswers[q.id] === optIdx ? 'border-[#CF6679] text-[#FFB4AB]' : 'border-transparent opacity-50'))
+                                                            : (quizAnswers[q.id] === optIdx ? 'border-[#A8C7FA] bg-[#A8C7FA]/10' : 'border-[#444746] hover:bg-[#2D2E30]')
+                                                        }
+                                                    `}
+                                                >
+                                                    <input 
+                                                        type="radio" 
+                                                        name={`q-${q.id}`} 
+                                                        className="hidden" 
+                                                        disabled={quizSubmitted}
+                                                        checked={quizAnswers[q.id] === optIdx}
+                                                        onChange={() => setQuizAnswers({...quizAnswers, [q.id]: optIdx})}
+                                                    />
+                                                    <div className={`w-4 h-4 rounded-full border mr-3 flex items-center justify-center ${quizAnswers[q.id] === optIdx ? 'border-[#A8C7FA]' : 'border-[#8E918F]'}`}>
+                                                        {quizAnswers[q.id] === optIdx && <div className="w-2 h-2 rounded-full bg-[#A8C7FA]" />}
+                                                    </div>
+                                                    <span className="text-sm text-[#C4C7C5]">{opt}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            
+                            {!quizSubmitted ? (
+                                <Button className="w-full mt-4" onClick={submitQuiz} disabled={Object.keys(quizAnswers).length < activeLesson.questions.length}>
+                                    Submit Quiz
+                                </Button>
+                            ) : (
+                                quizScore < 50 && (
+                                    <Button variant="outline" className="w-full mt-4" onClick={() => { setQuizSubmitted(false); setQuizAnswers({}); }}>
+                                        Retry Quiz
+                                    </Button>
+                                )
+                            )}
+                        </div>
+                    )}
+                </Card>
             ) : (
                 <Card className="p-6 md:p-8 mb-6 md:mb-8 min-h-[300px]">
                     <h2 className="text-xl md:text-2xl font-bold text-[#E3E3E3] mb-4 md:mb-6">{activeLesson.title}</h2>
-                    <div className="prose prose-invert max-w-none text-[#C4C7C5] text-sm md:text-base">
-                        <p>{activeLesson.content}</p>
-                        <p className="mt-4 p-4 bg-[#1E1F20] border border-[#444746] rounded-lg">
-                           Review the material above before proceeding to the next lesson.
-                        </p>
+                    <div className="prose prose-invert max-w-none text-[#C4C7C5] text-sm md:text-base mb-6">
+                        <p className="whitespace-pre-wrap">{activeLesson.content}</p>
                     </div>
+
+                    {activeLesson.fileUrl && (
+                        <div className="bg-[#1E1F20] border border-[#444746] rounded-xl p-4 flex items-center justify-between mt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#A8C7FA]/20 rounded-lg text-[#A8C7FA]">
+                                    <FileText className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <div className="text-[#E3E3E3] font-bold text-sm">Attached Document</div>
+                                    <div className="text-[#8E918F] text-xs">PDF / Document Resource</div>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <a href={activeLesson.fileUrl} download={`Lesson-${activeLesson.title}`} className="p-2 text-[#C4C7C5] hover:text-[#E3E3E3] hover:bg-[#2D2E30] rounded-lg transition-colors" title="Download">
+                                    <Download className="w-5 h-5" />
+                                </a>
+                                <a href={activeLesson.fileUrl} target="_blank" rel="noreferrer" className="p-2 text-[#A8C7FA] hover:bg-[#A8C7FA]/10 rounded-lg transition-colors" title="Open in New Tab">
+                                    <ExternalLink className="w-5 h-5" />
+                                </a>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <p className="mt-8 p-4 bg-[#1E1F20] border border-[#444746] rounded-lg text-sm text-[#8E918F]">
+                        Review the material above before proceeding to the next lesson.
+                    </p>
                 </Card>
             )}
 
@@ -257,7 +417,7 @@ export const Classroom: React.FC = () => {
                     Previous
                 </Button>
                 <div className="flex gap-4 w-full sm:w-auto">
-                    {!isCompleted(activeLesson.id) && (
+                    {!isCompleted(activeLesson.id) && activeLesson.type !== 'quiz' && (
                         <Button variant="outline" className="w-full sm:w-auto" onClick={() => {
                             saveCompletedLesson(course.id, activeLesson.id);
                             setCompletedLessonIds([...completedLessonIds, activeLesson.id]);
@@ -265,9 +425,16 @@ export const Classroom: React.FC = () => {
                             Mark Complete
                         </Button>
                     )}
-                    <Button variant="primary" className="w-full sm:w-auto bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3]" onClick={handleMarkComplete}>
-                        {isCompleted(activeLesson.id) ? 'Next Lesson' : 'Complete & Next'} <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
+                    {activeLesson.type !== 'quiz' && (
+                         <Button variant="primary" className="w-full sm:w-auto bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3]" onClick={handleMarkComplete}>
+                            {isCompleted(activeLesson.id) ? 'Next Lesson' : 'Complete & Next'} <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                    )}
+                    {activeLesson.type === 'quiz' && quizSubmitted && quizScore >= 50 && (
+                        <Button variant="primary" className="w-full sm:w-auto bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3]" onClick={handleNext}>
+                            Next Lesson <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>

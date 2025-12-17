@@ -64,11 +64,21 @@ export interface EarningMethod {
 }
 
 // Training System Types
+
+export interface QuizQuestion {
+    id: string;
+    question: string;
+    options: string[]; // Array of 4 options
+    correctAnswer: number; // Index (0-3)
+}
+
 export interface Lesson {
   id: string;
   title: string;
   type: 'video' | 'text' | 'quiz';
-  content: string; // URL or Markdown text
+  content: string; // URL for video, Text content for reading
+  fileUrl?: string; // PDF/Doc URL for reading
+  questions?: QuizQuestion[]; // For Quizzes
   duration: string; // e.g. "15 mins"
   isCompleted?: boolean;
 }
