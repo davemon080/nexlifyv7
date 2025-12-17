@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Nexlify - AI Powered Digital Platform</title>
+    <!-- Keeping Tailwind CDN for styling consistency without requiring complex CSS build setup -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap');
+      
+      body {
+        font-family: 'Google Sans', 'Inter', sans-serif;
+      }
+      /* Custom Scrollbar for Dark Theme */
+      ::-webkit-scrollbar {
+        width: 10px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #131314;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #444746;
+        border-radius: 5px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #5E5E5E;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@react-oauth/google": "https://esm.sh/@react-oauth/google@^0.12.2",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.10.1",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "mysql2/": "https://esm.sh/mysql2@^3.15.3/",
+    "@neondatabase/serverless": "https://esm.sh/@neondatabase/serverless@^1.0.2",
+    "@vercel/node": "https://esm.sh/@vercel/node@^5.5.15"
+  }
+}
+</script>
+</head>
+  <body class="bg-[#131314] text-[#E3E3E3] antialiased selection:bg-[#A8C7FA] selection:text-[#062E6F]">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
