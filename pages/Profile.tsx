@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser } from '../services/mockData';
+import { getCurrentUser, updateUser, changePassword } from '../services/mockData';
 import { User } from '../types';
-import { Card, Button, Badge } from '../components/UI';
-import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings } from 'lucide-react';
+import { Card, Button, Badge, Input } from '../components/UI';
+import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings, X, Save, Lock } from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', email: '' });
+  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -15,6 +19,7 @@ export const Profile: React.FC = () => {
       navigate('/login');
     } else {
       setUser(currentUser);
+      setEditForm({ name: currentUser.name, email: currentUser.email });
     }
   }, [navigate]);
 
@@ -22,6 +27,49 @@ export const Profile: React.FC = () => {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('isAdmin');
     navigate('/login');
+  };
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+        const updatedUser = { ...user, name: editForm.name, email: editForm.email };
+        await updateUser(updatedUser);
+        
+        // Update local storage and state
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        
+        alert('Profile updated successfully!');
+        setShowSettings(false);
+    } catch (error: any) {
+        alert(error.message || 'Failed to update profile');
+    } finally {
+        setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    if (passwordForm.new !== passwordForm.confirm) {
+        alert('New passwords do not match');
+        return;
+    }
+    
+    setIsLoading(true);
+    try {
+        await changePassword(user.id, passwordForm.current, passwordForm.new);
+        alert('Password changed successfully!');
+        setPasswordForm({ current: '', new: '', confirm: '' });
+    } catch (error: any) {
+        alert(error.message || 'Failed to change password');
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   if (!user) return null;
@@ -42,7 +90,7 @@ export const Profile: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-3">
-            <Button variant="outline" icon={Settings}>Settings</Button>
+            <Button variant="outline" icon={Settings} onClick={() => setShowSettings(true)}>Settings</Button>
             <Button variant="secondary" icon={LogOut} onClick={handleLogout}>Logout</Button>
           </div>
         </div>
@@ -144,6 +192,70 @@ export const Profile: React.FC = () => {
 
         </div>
       </div>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+            <Card className="max-w-2xl w-full bg-[#1E1F20] max-h-[90vh] flex flex-col overflow-hidden p-0 border border-[#444746]">
+                <div className="p-6 border-b border-[#444746] bg-[#131314] flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-[#E3E3E3]">Account Settings</h2>
+                    <button onClick={() => setShowSettings(false)} className="p-2 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5]"><X className="w-6 h-6" /></button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto space-y-8">
+                    <section>
+                        <h3 className="text-[#A8C7FA] font-medium mb-4 flex items-center gap-2"><UserIcon className="w-5 h-5" /> Personal Information</h3>
+                        <form onSubmit={handleUpdateProfile} className="space-y-4">
+                            <Input 
+                                label="Full Name" 
+                                value={editForm.name} 
+                                onChange={(e) => setEditForm({...editForm, name: e.target.value})} 
+                            />
+                            <Input 
+                                label="Email Address" 
+                                type="email"
+                                value={editForm.email} 
+                                onChange={(e) => setEditForm({...editForm, email: e.target.value})} 
+                            />
+                            <Button type="submit" isLoading={isLoading} icon={Save}>Update Profile</Button>
+                        </form>
+                    </section>
+
+                    <div className="border-t border-[#444746]" />
+
+                    <section>
+                        <h3 className="text-[#CF6679] font-medium mb-4 flex items-center gap-2"><Lock className="w-5 h-5" /> Security</h3>
+                        <form onSubmit={handleChangePassword} className="space-y-4">
+                            <Input 
+                                label="Current Password" 
+                                type="password" 
+                                value={passwordForm.current}
+                                onChange={(e) => setPasswordForm({...passwordForm, current: e.target.value})}
+                                required
+                            />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Input 
+                                    label="New Password" 
+                                    type="password" 
+                                    value={passwordForm.new}
+                                    onChange={(e) => setPasswordForm({...passwordForm, new: e.target.value})}
+                                    required
+                                />
+                                <Input 
+                                    label="Confirm New Password" 
+                                    type="password" 
+                                    value={passwordForm.confirm}
+                                    onChange={(e) => setPasswordForm({...passwordForm, confirm: e.target.value})}
+                                    required
+                                />
+                            </div>
+                            <Button type="submit" variant="secondary" isLoading={isLoading} icon={Save}>Change Password</Button>
+                        </form>
+                    </section>
+                </div>
+            </Card>
+        </div>
+      )}
     </div>
   );
 };

@@ -149,6 +149,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    if (action === 'changePassword') {
+        const { userId, currentPassword, newPassword } = body;
+        
+        // Verify current password
+        const { rows } = await pool.query('SELECT password FROM users WHERE id = $1', [userId]);
+        if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
+        
+        if (rows[0].password !== currentPassword) {
+            return res.status(401).json({ error: 'Incorrect current password' });
+        }
+
+        // Update password
+        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [newPassword, userId]);
+        return res.status(200).json({ success: true });
+    }
+
     // --- PRODUCTS ---
     if (action === 'getProducts') {
       // Postgres returns column names as is. We map snake_case db columns to camelCase API response if needed.

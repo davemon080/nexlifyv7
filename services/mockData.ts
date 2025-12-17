@@ -134,9 +134,27 @@ export const updateUser = async (updatedUser: User): Promise<void> => {
         const users = getLocal<User>('users');
         const idx = users.findIndex(u => u.id === updatedUser.id);
         if(idx !== -1) {
-            users[idx] = updatedUser;
+            users[idx] = { ...users[idx], ...updatedUser };
             setLocal('users', users);
         }
+    }
+};
+
+export const changePassword = async (userId: string, currentPassword: string, newPassword: string): Promise<void> => {
+    try {
+        await api('changePassword', 'POST', { userId, currentPassword, newPassword });
+        await logUserActivity(userId, 'Security', 'Password changed successfully', 'warning');
+    } catch (e: any) {
+        // Local Fallback
+        const users = getLocal<User>('users');
+        const idx = users.findIndex(u => u.id === userId);
+        if(idx !== -1) {
+            if (users[idx].password !== currentPassword) throw new Error('Incorrect current password');
+            users[idx].password = newPassword;
+            setLocal('users', users);
+            return;
+        }
+        throw new Error(e.message || 'Change password failed');
     }
 };
 
