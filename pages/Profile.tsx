@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, updateUser, changePassword } from '../services/mockData';
 import { User } from '../types';
 import { Card, Button, Badge, Input } from '../components/UI';
-import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings, X, Save, Lock } from 'lucide-react';
+import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings, X, Save, Lock, Camera, Upload } from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,6 +27,30 @@ export const Profile: React.FC = () => {
     localStorage.removeItem('currentUser');
     localStorage.removeItem('isAdmin');
     navigate('/login');
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && user) {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        setIsLoading(true);
+        const base64String = reader.result as string;
+        try {
+            const updatedUser = { ...user, photoUrl: base64String };
+            await updateUser(updatedUser);
+            // Update local storage and state
+            localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+            setUser(updatedUser);
+        } catch (error) {
+            console.error(error);
+            alert('Failed to upload image. In local mode, this persists to browser storage.');
+        } finally {
+            setIsLoading(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -80,13 +104,35 @@ export const Profile: React.FC = () => {
         
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 bg-[#4285F4] rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg border-4 border-[#1E1F20]">
-              {user.name.charAt(0)}
+          <div className="flex items-center gap-6">
+            <div className="relative group">
+                <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-[#1E1F20] shadow-xl bg-[#4285F4] flex items-center justify-center text-4xl font-bold text-white relative">
+                    {user.photoUrl ? (
+                        <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                        user.name.charAt(0).toUpperCase()
+                    )}
+                    
+                    {/* Overlay for upload */}
+                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <Camera className="w-8 h-8 text-white" />
+                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                    </label>
+                </div>
+                <div className="absolute bottom-0 right-0 bg-[#1E1F20] rounded-full p-1.5 border border-[#444746] md:hidden">
+                     <label className="cursor-pointer">
+                        <Camera className="w-4 h-4 text-[#A8C7FA]" />
+                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+                    </label>
+                </div>
             </div>
             <div>
               <h1 className="text-3xl font-bold text-[#E3E3E3]">{user.name}</h1>
               <p className="text-[#8E918F]">{user.email}</p>
+              <div className="mt-2 flex gap-2">
+                 <Badge color="blue">{user.role.toUpperCase()}</Badge>
+                 <Badge color={user.status === 'active' ? 'green' : 'red'}>{user.status?.toUpperCase() || 'ACTIVE'}</Badge>
+              </div>
             </div>
           </div>
           <div className="flex gap-3">

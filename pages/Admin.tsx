@@ -476,9 +476,13 @@ export const Admin: React.FC = () => {
                         <tr key={user.id} className="hover:bg-[#2D2E30] transition-colors group cursor-pointer" onClick={() => handleUserClick(user)}>
                             <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                                <div className="h-10 w-10 rounded-full bg-[#A8C7FA]/20 flex items-center justify-center text-[#A8C7FA] font-bold border border-[#A8C7FA]/30 text-lg">
-                                    {user.name.charAt(0).toUpperCase()}
-                                </div>
+                                {user.photoUrl ? (
+                                    <img src={user.photoUrl} alt={user.name} className="h-10 w-10 rounded-full object-cover border border-[#444746]" />
+                                ) : (
+                                    <div className="h-10 w-10 rounded-full bg-[#A8C7FA]/20 flex items-center justify-center text-[#A8C7FA] font-bold border border-[#A8C7FA]/30 text-lg">
+                                        {user.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                                 <div className="ml-4">
                                 <div className="text-sm font-bold text-[#E3E3E3]">{user.name} <span className="text-[10px] bg-[#444746] px-1.5 py-0.5 rounded text-[#C4C7C5] ml-2">{user.role}</span></div>
                                 <div className="text-sm text-[#8E918F]">{user.email}</div>
@@ -584,8 +588,14 @@ export const Admin: React.FC = () => {
                 <Card className="max-w-4xl w-full bg-[#1E1F20] max-h-[90vh] flex flex-col overflow-hidden p-0 border border-[#444746]">
                     <div className="p-6 border-b border-[#444746] bg-[#131314] flex justify-between items-start">
                         <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full bg-[#4285F4] flex items-center justify-center text-2xl font-bold text-white shadow-lg">
-                                {selectedUser.name.charAt(0).toUpperCase()}
+                            <div className="relative">
+                                {selectedUser.photoUrl ? (
+                                    <img src={selectedUser.photoUrl} alt={selectedUser.name} className="w-16 h-16 rounded-full object-cover shadow-lg border border-[#444746]" />
+                                ) : (
+                                    <div className="w-16 h-16 rounded-full bg-[#4285F4] flex items-center justify-center text-2xl font-bold text-white shadow-lg">
+                                        {selectedUser.name.charAt(0).toUpperCase()}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <h2 className="text-2xl font-bold text-[#E3E3E3]">{selectedUser.name}</h2>

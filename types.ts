@@ -38,6 +38,7 @@ export interface User {
   joinedAt: string;
   enrolledCourses?: string[]; // IDs of courses
   status?: 'active' | 'suspended' | 'banned';
+  photoUrl?: string;
 }
 
 export interface ActivityLog {
