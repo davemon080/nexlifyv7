@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button, Input, Card } from '../components/UI';
-import { UserPlus, ShieldAlert } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { registerUser, googleAuthenticate } from '../services/mockData';
 import { useGoogleLogin } from '@react-oauth/google';
 
@@ -10,8 +10,6 @@ export const Register: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [adminCode, setAdminCode] = useState('');
-  const [showAdminInput, setShowAdminInput] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -33,10 +31,10 @@ export const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      const role = showAdminInput ? 'admin' : 'user';
+      const role = 'user';
       // We pass the entered code to the backend. 
       // The backend compares it against the secure environment variable.
-      const user = await registerUser(name, email, password, role, adminCode);
+      const user = await registerUser(name, email, password, role);
       
       localStorage.setItem('currentUser', JSON.stringify(user));
       
@@ -141,29 +139,6 @@ export const Register: React.FC = () => {
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
-
-          {/* Admin Toggle */}
-          <div className="pt-2">
-            <button 
-                type="button" 
-                onClick={() => setShowAdminInput(!showAdminInput)}
-                className="text-xs text-[#8E918F] hover:text-[#A8C7FA] flex items-center gap-1"
-            >
-                <ShieldAlert className="w-3 h-3" /> Register as Admin?
-            </button>
-            {showAdminInput && (
-                <div className="mt-3 animate-fadeIn">
-                    <Input
-                        type="password"
-                        label="Admin Secret Code"
-                        placeholder="Enter secret code..."
-                        value={adminCode}
-                        onChange={(e) => setAdminCode(e.target.value)}
-                    />
-                    <p className="text-[10px] text-[#8E918F] mt-1 ml-1">Requires valid server-side validation.</p>
-                </div>
-            )}
-          </div>
           
           {error && <div className="text-sm text-[#CF6679] text-center bg-[#CF6679]/10 py-2 rounded-lg">{error}</div>}
           

@@ -133,7 +133,7 @@ export const Hire: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => window.open('https://wa.me/1234567890', '_blank')}
+              onClick={() => window.open('https://wa.me/2348167240880', '_blank')}
               className="w-full flex items-center justify-center px-4 py-3 border border-[#444746] rounded-full text-[#C4C7C5] bg-[#131314] hover:bg-[#2D2E30] transition-all duration-200 font-medium"
             >
               <MessageCircle className="w-5 h-5 text-[#6DD58C] mr-2" />

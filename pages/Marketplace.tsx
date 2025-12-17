@@ -246,6 +246,7 @@ export const Marketplace: React.FC = () => {
                   <img 
                     src={product.imageUrl} 
                     alt={product.title} 
+                    loading="lazy"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" 
                   />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -350,7 +351,7 @@ export const Marketplace: React.FC = () => {
                           />
                       ) : (
                           <div className="w-full h-full flex items-center justify-center bg-[#131314]">
-                             <img src={previewProduct.imageUrl} className="max-w-full max-h-full object-contain" alt="Preview" />
+                             <img src={previewProduct.imageUrl} loading="lazy" className="max-w-full max-h-full object-contain" alt="Preview" />
                           </div>
                       )}
                   </div>
