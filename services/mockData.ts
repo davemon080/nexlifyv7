@@ -396,6 +396,30 @@ export const adminEnrollUser = async (userId: string, courseId: string): Promise
     }
 };
 
+export const adminRevokeAccess = async (userId: string, courseId: string): Promise<User> => {
+    try {
+        await api('unenroll', 'POST', { userId, courseId });
+        await logUserActivity(userId, 'Admin Revoke', `Admin revoked access to course ${courseId}`, 'warning');
+        
+        const users = await getAllUsers();
+        const user = users.find(u => u.id === userId);
+        if(!user) throw new Error("User not found");
+        return user;
+    } catch {
+        // Local Fallback
+        const users = getLocal<User>('users');
+        const user = users.find(u => u.id === userId);
+        if(user) {
+            user.enrolledCourses = (user.enrolledCourses || []).filter(id => id !== courseId);
+            const idx = users.findIndex(u => u.id === userId);
+            users[idx] = user;
+            setLocal('users', users);
+            return user;
+        }
+        throw new Error("User not found (Local)");
+    }
+};
+
 export const enrollInCourse = async (courseId: string): Promise<void> => {
     const user = getCurrentUser();
     if (!user) return;
@@ -467,6 +491,16 @@ export const submitInquiry = async (inquiryData: Omit<Inquiry, 'id' | 'createdAt
         const inquiries = getLocal<Inquiry>('inquiries');
         inquiries.unshift({ ...inquiryData, id, createdAt: new Date().toISOString(), status: 'new' });
         setLocal('inquiries', inquiries);
+    }
+};
+
+export const deleteInquiry = async (id: string): Promise<void> => {
+    try {
+        await api('deleteInquiry', 'POST', { id });
+    } catch {
+        const inquiries = getLocal<Inquiry>('inquiries');
+        const newInquiries = inquiries.filter(i => i.id !== id);
+        setLocal('inquiries', newInquiries);
     }
 };
 

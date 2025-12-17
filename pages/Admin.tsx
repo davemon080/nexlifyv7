@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings, getAdminStats } from '../services/mockData';
+import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings, getAdminStats, deleteInquiry, adminRevokeAccess } from '../services/mockData';
 import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion, AppSettings, PageSeoConfig } from '../types';
 import { Button, Input, Card, Badge, Textarea } from '../components/UI';
-import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle, Settings, Save, BarChart3, TrendingUp, Globe, Link as LinkIcon, Eye } from 'lucide-react';
+import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, GripVertical, Gift, Settings, Save, BarChart3, TrendingUp, Globe, Eye, BookOpen } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
@@ -158,7 +158,9 @@ export const Admin: React.FC = () => {
 
   // --- USER HANDLERS ---
   const handleUserClick = async (user: User) => {
-      setSelectedUser(user);
+      // Find latest user data from the loaded users list (which should contain enrollments)
+      const freshUser = users.find(u => u.id === user.id) || user;
+      setSelectedUser(freshUser);
       const logs = await getUserActivity(user.id);
       setUserActivity(logs);
       setSelectedCourseToGrant(''); // Reset dropdown
@@ -194,6 +196,32 @@ export const Admin: React.FC = () => {
       setIsUpdatingUser(false);
       alert(`Access granted to course successfully.`);
       setSelectedCourseToGrant('');
+  };
+
+  const handleRevokeAccess = async (courseId: string) => {
+      if (!selectedUser) return;
+      if (!window.confirm("Are you sure you want to revoke access to this course?")) return;
+
+      setIsUpdatingUser(true);
+      try {
+          const updatedUser = await adminRevokeAccess(selectedUser.id, courseId);
+          setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+          setSelectedUser(updatedUser);
+          alert("Access revoked successfully.");
+      } catch (e) {
+          alert("Failed to revoke access.");
+          console.error(e);
+      } finally {
+          setIsUpdatingUser(false);
+      }
+  };
+
+  // --- INQUIRIES HANDLERS ---
+  const handleDeleteInquiry = async (id: string) => {
+      if(window.confirm("Are you sure you want to delete this inquiry?")) {
+          await deleteInquiry(id);
+          setInquiries(prev => prev.filter(i => i.id !== id));
+      }
   };
 
   // --- PRODUCT HANDLERS ---
@@ -765,7 +793,12 @@ export const Admin: React.FC = () => {
                         <h3 className="text-xl font-bold text-[#E3E3E3]">{inquiry.serviceType}</h3>
                         <p className="text-sm text-[#C4C7C5] mt-1">From: <span className="text-[#E3E3E3]">{inquiry.name}</span> ({inquiry.email})</p>
                     </div>
-                    <span className="text-xs text-[#8E918F] bg-[#131314] px-3 py-1 rounded-full border border-[#444746] whitespace-nowrap">{new Date(inquiry.createdAt).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs text-[#8E918F] bg-[#131314] px-3 py-1 rounded-full border border-[#444746] whitespace-nowrap">{new Date(inquiry.createdAt).toLocaleDateString()}</span>
+                        <button onClick={() => handleDeleteInquiry(inquiry.id)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-full transition-colors" title="Delete Inquiry">
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                    </div>
                     </div>
                     <div className="bg-[#131314] p-5 rounded-2xl text-[#C4C7C5] text-sm leading-relaxed border border-[#444746]">
                     {inquiry.message}
@@ -853,21 +886,53 @@ export const Admin: React.FC = () => {
                             <div className="lg:col-span-2 space-y-8">
                                 {/* Grant Access Section */}
                                 <div className="bg-[#131314] p-6 rounded-2xl border border-[#444746]">
-                                    <h3 className="text-[#A8C7FA] font-bold mb-4 flex items-center gap-2"><Gift className="w-5 h-5" /> Grant Access (Free Enrollment)</h3>
-                                    <div className="flex gap-4">
-                                        <select 
-                                            className="flex-1 rounded-2xl bg-[#1E1F20] border border-[#444746] px-5 py-3 text-[#E3E3E3] outline-none"
-                                            value={selectedCourseToGrant}
-                                            onChange={(e) => setSelectedCourseToGrant(e.target.value)}
-                                        >
-                                            <option value="">Select Course...</option>
-                                            {courses.map(c => (
-                                                <option key={c.id} value={c.id} disabled={selectedUser.enrolledCourses?.includes(c.id)}>
-                                                    {c.title} {selectedUser.enrolledCourses?.includes(c.id) ? '(Enrolled)' : ''}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        <Button onClick={handleGrantAccess} disabled={!selectedCourseToGrant} isLoading={isUpdatingUser}>Grant</Button>
+                                    <h3 className="text-[#A8C7FA] font-bold mb-4 flex items-center gap-2"><Gift className="w-5 h-5" /> Course Enrollment Management</h3>
+                                    
+                                    {/* List Enrolled Courses with Revoke Option */}
+                                    <div className="mb-6">
+                                        <h4 className="text-[#E3E3E3] text-sm font-medium mb-2">Current Enrollments</h4>
+                                        {selectedUser.enrolledCourses && selectedUser.enrolledCourses.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {selectedUser.enrolledCourses.map(courseId => {
+                                                    const course = courses.find(c => c.id === courseId);
+                                                    return (
+                                                        <div key={courseId} className="flex justify-between items-center bg-[#1E1F20] p-3 rounded-xl border border-[#444746]">
+                                                            <div className="flex items-center gap-2">
+                                                                <BookOpen className="w-4 h-4 text-[#A8C7FA]" />
+                                                                <span className="text-sm text-[#E3E3E3]">{course ? course.title : 'Unknown Course'}</span>
+                                                            </div>
+                                                            <button 
+                                                                onClick={() => handleRevokeAccess(courseId)}
+                                                                className="text-xs text-[#CF6679] hover:bg-[#CF6679]/10 px-2 py-1 rounded transition-colors"
+                                                            >
+                                                                Revoke Access
+                                                            </button>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="text-[#8E918F] text-sm italic p-2 border border-dashed border-[#444746] rounded-xl text-center">User is not enrolled in any courses.</div>
+                                        )}
+                                    </div>
+
+                                    <div className="border-t border-[#444746] pt-4">
+                                        <h4 className="text-[#E3E3E3] text-sm font-medium mb-3">Grant New Access</h4>
+                                        <div className="flex gap-4">
+                                            <select 
+                                                className="flex-1 rounded-2xl bg-[#1E1F20] border border-[#444746] px-5 py-3 text-[#E3E3E3] outline-none"
+                                                value={selectedCourseToGrant}
+                                                onChange={(e) => setSelectedCourseToGrant(e.target.value)}
+                                            >
+                                                <option value="">Select Course...</option>
+                                                {courses.map(c => (
+                                                    <option key={c.id} value={c.id} disabled={selectedUser.enrolledCourses?.includes(c.id)}>
+                                                        {c.title} {selectedUser.enrolledCourses?.includes(c.id) ? '(Enrolled)' : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <Button onClick={handleGrantAccess} disabled={!selectedCourseToGrant} isLoading={isUpdatingUser}>Grant</Button>
+                                        </div>
                                     </div>
                                 </div>
 

@@ -281,8 +281,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- USERS MANAGEMENT ---
 
     if (action === 'getAllUsers') {
-      const { rows } = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
-      const mapped = rows.map((u: any) => ({
+      // Fetch users
+      const { rows: users } = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
+      
+      // Fetch all enrollments efficiently
+      const { rows: enrollments } = await pool.query('SELECT user_id, course_id FROM enrollments');
+      
+      const enrollMap = new Map<string, string[]>();
+      enrollments.forEach((e: any) => {
+          if (!enrollMap.has(e.user_id)) enrollMap.set(e.user_id, []);
+          enrollMap.get(e.user_id)?.push(e.course_id);
+      });
+
+      const mapped = users.map((u: any) => ({
         id: u.id,
         name: u.name,
         email: u.email,
@@ -291,7 +302,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: u.status,
         photoUrl: u.photo_url,
         joinedAt: u.created_at,
-        enrolledCourses: [] 
+        enrolledCourses: enrollMap.get(u.id) || []
       }));
       return res.status(200).json(mapped);
     }
@@ -400,6 +411,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true });
     }
 
+    if (action === 'unenroll') {
+        const { userId, courseId } = body;
+        await pool.query('DELETE FROM enrollments WHERE user_id=$1 AND course_id=$2', [userId, courseId]);
+        return res.status(200).json({ success: true });
+    }
+
     if (action === 'checkEnrollment') {
         const userId = req.query.userId;
         const courseId = req.query.courseId;
@@ -414,6 +431,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'INSERT INTO inquiries (id, name, email, message, service_type) VALUES ($1, $2, $3, $4, $5)',
         [id, name, email, message, serviceType]
       );
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'deleteInquiry') {
+      const { id } = body;
+      await pool.query('DELETE FROM inquiries WHERE id = $1', [id]);
       return res.status(200).json({ success: true });
     }
 
