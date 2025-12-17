@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getCourseById } from '../services/mockData';
+import { getCourseById, getCompletedLessons, saveCompletedLesson } from '../services/mockData';
 import { Course, Module, Lesson } from '../types';
 import { Button, Card, Badge } from '../components/UI';
-import { PlayCircle, CheckCircle, Lock, Menu, FileText, Video, X, ChevronRight } from 'lucide-react';
+import { PlayCircle, CheckCircle, Lock, Menu, FileText, Video, X, ChevronRight, ChevronLeft } from 'lucide-react';
 
 export const Classroom: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -11,24 +11,52 @@ export const Classroom: React.FC = () => {
   const [course, setCourse] = useState<Course | undefined>(undefined);
   const [activeModule, setActiveModule] = useState<Module | undefined>(undefined);
   const [activeLesson, setActiveLesson] = useState<Lesson | undefined>(undefined);
-  // Default to true on desktop, false on mobile. Handled by initial check or effect.
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
 
   useEffect(() => {
     // Basic check for "enrollment"
     const isEnrolled = localStorage.getItem(`enrolled_${id}`) === 'true';
     if (!isEnrolled) {
-      navigate(`/training/${id}`);
-      return;
+      // Allow if admin or specific user override, otherwise redirect
+      const user = localStorage.getItem('currentUser');
+      if(user && JSON.parse(user).enrolledCourses?.includes(id)) {
+          // OK
+      } else {
+        navigate(`/training/${id}`);
+        return;
+      }
     }
 
     const load = async () => {
       if (id) {
         const c = await getCourseById(id);
-        if (c) {
+        if (c && c.modules.length > 0) {
           setCourse(c);
-          setActiveModule(c.modules[0]);
-          setActiveLesson(c.modules[0].lessons[0]);
+          
+          // Load progress
+          const completed = getCompletedLessons(id);
+          setCompletedLessonIds(completed);
+
+          // Attempt to find first unfinished lesson
+          let found = false;
+          for(const m of c.modules) {
+              for(const l of m.lessons) {
+                  if(!completed.includes(l.id)) {
+                      setActiveModule(m);
+                      setActiveLesson(l);
+                      found = true;
+                      break;
+                  }
+              }
+              if(found) break;
+          }
+
+          // If all completed or none found, default to first
+          if(!found) {
+            setActiveModule(c.modules[0]);
+            setActiveLesson(c.modules[0].lessons[0]);
+          }
         }
       }
     };
@@ -47,7 +75,68 @@ export const Classroom: React.FC = () => {
 
   }, [id, navigate]);
 
-  if (!course || !activeModule || !activeLesson) return <div className="min-h-screen bg-[#131314]"></div>;
+  const handleMarkComplete = () => {
+      if(!course || !activeLesson || !activeModule) return;
+      
+      // 1. Save Progress
+      saveCompletedLesson(course.id, activeLesson.id);
+      if(!completedLessonIds.includes(activeLesson.id)) {
+          setCompletedLessonIds([...completedLessonIds, activeLesson.id]);
+      }
+
+      // 2. Navigate Next
+      handleNext();
+  };
+
+  const handleNext = () => {
+      if(!course || !activeLesson || !activeModule) return;
+
+      const currentLessonIdx = activeModule.lessons.findIndex(l => l.id === activeLesson.id);
+      
+      // Next lesson in current module
+      if (currentLessonIdx < activeModule.lessons.length - 1) {
+          setActiveLesson(activeModule.lessons[currentLessonIdx + 1]);
+      } 
+      // Next module
+      else {
+          const currentModuleIdx = course.modules.findIndex(m => m.id === activeModule.id);
+          if (currentModuleIdx < course.modules.length - 1) {
+              const nextModule = course.modules[currentModuleIdx + 1];
+              setActiveModule(nextModule);
+              if(nextModule.lessons.length > 0) {
+                  setActiveLesson(nextModule.lessons[0]);
+              }
+          } else {
+              alert("Congratulations! You have completed the course.");
+          }
+      }
+  };
+
+  const handlePrev = () => {
+      if(!course || !activeLesson || !activeModule) return;
+
+      const currentLessonIdx = activeModule.lessons.findIndex(l => l.id === activeLesson.id);
+      
+      // Prev lesson in current module
+      if (currentLessonIdx > 0) {
+          setActiveLesson(activeModule.lessons[currentLessonIdx - 1]);
+      } 
+      // Prev module
+      else {
+          const currentModuleIdx = course.modules.findIndex(m => m.id === activeModule.id);
+          if (currentModuleIdx > 0) {
+              const prevModule = course.modules[currentModuleIdx - 1];
+              setActiveModule(prevModule);
+              if(prevModule.lessons.length > 0) {
+                  setActiveLesson(prevModule.lessons[prevModule.lessons.length - 1]);
+              }
+          }
+      }
+  };
+
+  const isCompleted = (lessonId: string) => completedLessonIds.includes(lessonId);
+
+  if (!course || !activeModule || !activeLesson) return <div className="min-h-screen bg-[#131314] flex items-center justify-center text-[#E3E3E3]">Loading Classroom...</div>;
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden relative">
@@ -69,7 +158,7 @@ export const Classroom: React.FC = () => {
         <div className="p-4 border-b border-[#444746] flex justify-between items-center h-16">
           <div>
             <h2 className="font-bold text-[#E3E3E3] text-sm uppercase tracking-wide truncate max-w-[200px]">{course.title}</h2>
-            <div className="text-xs text-[#8E918F]">Week {course.modules.findIndex(m => m.id === activeModule.id) + 1} of 12</div>
+            <div className="text-xs text-[#8E918F]">Week {course.modules.findIndex(m => m.id === activeModule.id) + 1} of {course.modules.length}</div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-[#C4C7C5]">
              <X className="w-5 h-5" />
@@ -97,14 +186,22 @@ export const Classroom: React.FC = () => {
                   {module.lessons.map(lesson => (
                     <div 
                       key={lesson.id} 
-                      className={`pl-8 pr-4 py-3 flex items-start gap-3 cursor-pointer text-xs ${activeLesson.id === lesson.id ? 'text-[#6DD58C] bg-[#6DD58C]/10' : 'text-[#8E918F] hover:text-[#E3E3E3]'}`}
+                      className={`pl-8 pr-4 py-3 flex items-start gap-3 cursor-pointer text-xs group ${activeLesson.id === lesson.id ? 'bg-[#A8C7FA]/10' : 'hover:bg-[#1E1F20]'}`}
                       onClick={() => {
                           setActiveLesson(lesson);
                           if (window.innerWidth < 768) setSidebarOpen(false);
                       }}
                     >
-                      <div className="mt-0.5">{lesson.type === 'video' ? <Video className="w-3 h-3" /> : <FileText className="w-3 h-3" />}</div>
-                      <span className="leading-snug">{lesson.title}</span>
+                      <div className="mt-0.5 flex-shrink-0">
+                          {isCompleted(lesson.id) ? (
+                              <CheckCircle className="w-4 h-4 text-[#6DD58C]" />
+                          ) : (
+                              lesson.type === 'video' ? <Video className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} /> : <FileText className={`w-4 h-4 ${activeLesson.id === lesson.id ? 'text-[#A8C7FA]' : 'text-[#5E5E5E]'}`} />
+                          )}
+                      </div>
+                      <span className={`leading-snug ${activeLesson.id === lesson.id ? 'text-[#A8C7FA] font-medium' : isCompleted(lesson.id) ? 'text-[#C4C7C5] line-through decoration-[#5E5E5E]' : 'text-[#8E918F]'}`}>
+                          {lesson.title}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -124,6 +221,9 @@ export const Classroom: React.FC = () => {
             <span className="text-[#8E918F] truncate max-w-[100px] sm:max-w-xs">{activeModule.title}</span>
             <ChevronRight className="w-4 h-4 mx-1 text-[#444746] flex-shrink-0" />
             <span className="text-[#E3E3E3] font-medium truncate">{activeLesson.title}</span>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+               {isCompleted(activeLesson.id) && <Badge color="green">Completed</Badge>}
           </div>
         </div>
 
@@ -145,14 +245,30 @@ export const Classroom: React.FC = () => {
                     <h2 className="text-xl md:text-2xl font-bold text-[#E3E3E3] mb-4 md:mb-6">{activeLesson.title}</h2>
                     <div className="prose prose-invert max-w-none text-[#C4C7C5] text-sm md:text-base">
                         <p>{activeLesson.content}</p>
-                        <p className="mt-4">Detailed reading material would appear here...</p>
+                        <p className="mt-4 p-4 bg-[#1E1F20] border border-[#444746] rounded-lg">
+                           Review the material above before proceeding to the next lesson.
+                        </p>
                     </div>
                 </Card>
             )}
 
-            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 pb-12">
-                <Button variant="outline" className="w-full sm:w-auto" disabled>Previous Lesson</Button>
-                <Button variant="primary" className="w-full sm:w-auto">Mark as Complete & Next</Button>
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-8 pb-12 border-t border-[#444746] pt-8">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={handlePrev} icon={ChevronLeft}>
+                    Previous
+                </Button>
+                <div className="flex gap-4 w-full sm:w-auto">
+                    {!isCompleted(activeLesson.id) && (
+                        <Button variant="outline" className="w-full sm:w-auto" onClick={() => {
+                            saveCompletedLesson(course.id, activeLesson.id);
+                            setCompletedLessonIds([...completedLessonIds, activeLesson.id]);
+                        }}>
+                            Mark Complete
+                        </Button>
+                    )}
+                    <Button variant="primary" className="w-full sm:w-auto bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3]" onClick={handleMarkComplete}>
+                        {isCompleted(activeLesson.id) ? 'Next Lesson' : 'Complete & Next'} <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                </div>
             </div>
         </div>
       </div>

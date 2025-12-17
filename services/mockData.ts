@@ -342,6 +342,28 @@ export const checkEnrollment = async (courseId: string): Promise<boolean> => {
     }
 };
 
+// --- PROGRESS TRACKING ---
+// Currently using LocalStorage to ensure functionality without schema migration complexity for the user.
+export const getCompletedLessons = (courseId: string): string[] => {
+    const user = getCurrentUser();
+    if (!user) return [];
+    const key = `progress_${user.id}_${courseId}`;
+    try {
+        return JSON.parse(localStorage.getItem(key) || '[]');
+    } catch { return []; }
+}
+
+export const saveCompletedLesson = (courseId: string, lessonId: string) => {
+    const user = getCurrentUser();
+    if (!user) return;
+    const key = `progress_${user.id}_${courseId}`;
+    const completed = getCompletedLessons(courseId);
+    if (!completed.includes(lessonId)) {
+        completed.push(lessonId);
+        localStorage.setItem(key, JSON.stringify(completed));
+    }
+}
+
 // --- INQUIRIES ---
 
 export const submitInquiry = async (inquiryData: Omit<Inquiry, 'id' | 'createdAt' | 'status'>): Promise<void> => {
