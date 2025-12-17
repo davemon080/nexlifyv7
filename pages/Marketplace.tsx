@@ -111,21 +111,32 @@ export const Marketplace: React.FC = () => {
                  amount: Math.ceil(price * 100), // Amount in kobo
                  currency: 'NGN',
                  ref: `nex-prod-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, // Unique reference
-                 callback: async function(response: any) {
-                     console.log("Payment success:", response);
-                     await recordTransaction(currentUser.id, 'product_purchase', product.id, price, response.reference);
-                     await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${price}`, 'success');
-                     
-                     // Refresh user state
-                     const updatedUser = getCurrentUser();
-                     setUser(updatedUser);
+                 // FIX: Removed 'async' keyword here. Paystack requires a standard function.
+                 callback: function(response: any) {
+                     // We wrap the async logic in an internal function and call it immediately.
+                     const processSuccess = async () => {
+                         console.log("Payment success:", response);
+                         try {
+                            await recordTransaction(currentUser.id, 'product_purchase', product.id, price, response.reference);
+                            await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${price}`, 'success');
+                            
+                            // Refresh user state
+                            const updatedUser = getCurrentUser();
+                            setUser(updatedUser);
 
-                     alert("Payment successful! Downloading your file...");
-                     handleDownload(product);
+                            alert("Payment successful! Downloading your file...");
+                            handleDownload(product);
+                            
+                            if (previewProduct && previewProduct.id === product.id) {
+                                setPreviewProduct(null);
+                            }
+                         } catch (err) {
+                             console.error("Post-payment processing error:", err);
+                             alert("Payment verified, but there was an error updating your account. Please contact support.");
+                         }
+                     };
                      
-                     if (previewProduct && previewProduct.id === product.id) {
-                         setPreviewProduct(null);
-                     }
+                     processSuccess();
                  },
                  onClose: function() {
                      alert('Transaction was cancelled.');
