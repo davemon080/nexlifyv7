@@ -79,11 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               return res.status(403).json({ error: 'Account suspended' });
           }
           
-          // Update photo if changed/missing
-          if (picture && user.photo_url !== picture) {
-               await pool.query('UPDATE users SET photo_url = $1 WHERE id = $2', [picture, user.id]);
-               user.photo_url = picture;
-          }
+          // NOTE: We do NOT update the photo_url here to preserve user's custom uploads.
           
           // Fetch enrollments
           const { rows: enrollRows } = await pool.query('SELECT course_id FROM enrollments WHERE user_id = $1', [user.id]);
