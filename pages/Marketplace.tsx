@@ -68,7 +68,13 @@ export const Marketplace: React.FC = () => {
     }
   };
 
-  const handlePurchase = (product: Product) => {
+  const handlePurchase = (product: Product, e?: React.MouseEvent) => {
+    // Prevent event bubbling if clicked inside a card
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     const currentUser = getCurrentUser();
     if (!currentUser) {
         alert("You must be logged in to purchase products.");
@@ -76,7 +82,9 @@ export const Marketplace: React.FC = () => {
         return;
     }
 
-    if (product.price > 0) {
+    const price = Number(product.price);
+
+    if (price > 0) {
          // Check if Paystack script is loaded
          const PaystackPop = (window as any).PaystackPop;
          
@@ -85,35 +93,55 @@ export const Marketplace: React.FC = () => {
              return;
          }
 
-         const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; // Your Key
+         const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; // Explicit Key
 
-         const handler = PaystackPop.setup({
-             key: paystackKey,
+         console.log("Initializing Paystack Payment:", {
              email: currentUser.email,
-             amount: Math.ceil(product.price * 100), // Ensure integer (kobo)
-             currency: 'NGN',
-             ref: '' + Math.floor((Math.random() * 1000000000) + 1), // Generate a random reference number
-             callback: async function(response: any) {
-                 // Payment success
-                 await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
-                 await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
-                 
-                 // Refresh user state to reflect purchase immediately
-                 const updatedUser = getCurrentUser();
-                 setUser(updatedUser);
-
-                 alert("Payment successful! Downloading your file...");
-                 handleDownload(product);
-             },
-             onClose: function() {
-                 alert('Transaction was cancelled.');
-             },
+             amount: price,
+             key: paystackKey
          });
-         
-         handler.openIframe();
+
+         try {
+             const handler = PaystackPop.setup({
+                 key: paystackKey,
+                 email: currentUser.email,
+                 amount: Math.ceil(price * 100), // Amount in kobo
+                 currency: 'NGN',
+                 ref: '' + Math.floor((Math.random() * 1000000000) + 1), // Generate a random reference number
+                 callback: async function(response: any) {
+                     // Payment success
+                     console.log("Payment complete", response);
+                     await recordTransaction(currentUser.id, 'product_purchase', product.id, price, response.reference);
+                     await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${price}`, 'success');
+                     
+                     // Refresh user state to reflect purchase immediately
+                     const updatedUser = getCurrentUser();
+                     setUser(updatedUser);
+
+                     alert("Payment successful! Downloading your file...");
+                     handleDownload(product);
+                     
+                     // If modal was open, close it now
+                     if (previewProduct && previewProduct.id === product.id) {
+                         setPreviewProduct(null);
+                     }
+                 },
+                 onClose: function() {
+                     alert('Transaction was cancelled.');
+                 },
+             });
+             
+             handler.openIframe();
+         } catch (err) {
+             console.error("Paystack setup error:", err);
+             alert("Could not initialize payment. Please try again.");
+         }
     } else {
          // Free product logic
          handleDownload(product);
+         if (previewProduct && previewProduct.id === product.id) {
+             setPreviewProduct(null);
+         }
     }
   };
 
@@ -222,7 +250,7 @@ export const Marketplace: React.FC = () => {
                         <Badge color="green"><div className="flex items-center gap-1"><Check className="w-3 h-3"/> Owned</div></Badge>
                     ) : (
                         <Badge color={product.price === 0 ? 'green' : 'blue'}>
-                          {product.price === 0 ? 'FREE' : `₦${product.price.toLocaleString()}`}
+                          {product.price === 0 ? 'FREE' : `₦${Number(product.price).toLocaleString()}`}
                         </Badge>
                     )}
                   </div>
@@ -249,11 +277,11 @@ export const Marketplace: React.FC = () => {
                     ) : (
                         <Button 
                             className="flex-1" 
-                            variant={product.price === 0 ? 'secondary' : 'primary'}
-                            icon={product.price === 0 ? Download : ShoppingCart}
-                            onClick={() => product.price === 0 ? handleDownload(product) : handlePurchase(product)}
+                            variant={Number(product.price) === 0 ? 'secondary' : 'primary'}
+                            icon={Number(product.price) === 0 ? Download : ShoppingCart}
+                            onClick={(e) => handlePurchase(product, e)}
                         >
-                            {product.price === 0 ? 'Get' : 'Buy'}
+                            {Number(product.price) === 0 ? 'Get' : 'Buy'}
                         </Button>
                     )}
                   </div>
@@ -326,18 +354,11 @@ export const Marketplace: React.FC = () => {
                             </Button>
                         ) : (
                             <Button 
-                                variant={previewProduct.price === 0 ? 'secondary' : 'primary'}
-                                icon={previewProduct.price === 0 ? Download : ShoppingCart}
-                                onClick={() => {
-                                    if (previewProduct.price === 0) {
-                                        handleDownload(previewProduct);
-                                    } else {
-                                        handlePurchase(previewProduct);
-                                        setPreviewProduct(null); // Close modal on purchase flow
-                                    }
-                                }}
+                                variant={Number(previewProduct.price) === 0 ? 'secondary' : 'primary'}
+                                icon={Number(previewProduct.price) === 0 ? Download : ShoppingCart}
+                                onClick={(e) => handlePurchase(previewProduct, e)}
                             >
-                                {previewProduct.price === 0 ? 'Download Template' : `Buy Template (₦${previewProduct.price.toLocaleString()})`}
+                                {Number(previewProduct.price) === 0 ? 'Download Template' : `Buy Template (₦${Number(previewProduct.price).toLocaleString()})`}
                             </Button>
                         )}
                   </div>
