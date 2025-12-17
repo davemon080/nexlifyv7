@@ -1,81 +1,51 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Badge } from '../components/UI';
-import { Bot, Sparkles, ArrowLeft, Download, FileText, Video, Mic, Image, AudioLines, Bell } from 'lucide-react';
+import { Bot, Sparkles, Timer, ArrowLeft, Rocket, Download, FileText, Video, Play, Music } from 'lucide-react';
 
 export const AiTools: React.FC = () => {
   const navigate = useNavigate();
 
   const tools = [
     {
+      id: 'downloader',
+      title: 'Video Downloader',
+      description: 'Download videos from YouTube, Facebook, Instagram, and more in high quality.',
+      icon: Download,
+      color: 'text-[#6DD58C]',
+      bgColor: 'bg-[#0F5223]',
+      status: 'Active',
+      path: '/ai-tools/downloader'
+    },
+    {
+      id: 'transcribe',
+      title: 'Video Transcribe',
+      description: 'Extract text and captions from any video using advanced AI speech recognition.',
+      icon: FileText,
+      color: 'text-[#A8C7FA]',
+      bgColor: 'bg-[#0842A0]',
+      status: 'Active',
+      path: '/ai-tools/transcribe'
+    },
+    {
       id: 'chat',
-      title: 'AI Chatbot',
-      description: 'Ask questions and get intelligent responses from Gemini 3 Pro.',
+      title: 'AI Chat Assistant',
+      description: 'Get instant answers and coding help from our advanced language model.',
       icon: Bot,
       color: 'text-[#9B72CB]',
       bgColor: 'bg-[#4A0072]',
       status: 'Coming Soon',
-      path: '/ai-tools/chat'
+      path: '#'
     },
     {
-      id: 'image',
-      title: 'Image Analyzer',
-      description: 'Upload photos and get detailed insights using computer vision.',
-      icon: Image,
+      id: 'content',
+      title: 'Content Generator',
+      description: 'Generate SEO-optimized blog posts, emails, and social media captions.',
+      icon: Sparkles,
       color: 'text-[#D96570]',
       bgColor: 'bg-[#370007]',
       status: 'Coming Soon',
-      path: '/ai-tools/image'
-    },
-    {
-      id: 'video',
-      title: 'Video Understanding',
-      description: 'Analyze video content for summaries and key information.',
-      icon: Video,
-      color: 'text-[#6DD58C]',
-      bgColor: 'bg-[#0F5223]',
-      status: 'Coming Soon',
-      path: '/ai-tools/video'
-    },
-    {
-      id: 'audio',
-      title: 'Audio Transcribe',
-      description: 'Record your voice and convert it to text instantly.',
-      icon: Mic,
-      color: 'text-[#A8C7FA]',
-      bgColor: 'bg-[#0842A0]',
-      status: 'Coming Soon',
-      path: '/ai-tools/audio'
-    },
-    {
-      id: 'tts',
-      title: 'Text to Speech',
-      description: 'Turn your text into lifelike spoken audio.',
-      icon: AudioLines,
-      color: 'text-[#FFD97D]',
-      bgColor: 'bg-[#5B4300]',
-      status: 'Coming Soon',
-      path: '/ai-tools/tts'
-    },
-    {
-      id: 'downloader',
-      title: 'Video Downloader',
-      description: 'Download videos from YouTube, Facebook, and more.',
-      icon: Download,
-      color: 'text-[#6DD58C]',
-      bgColor: 'bg-[#0F5223]',
-      status: 'Coming Soon',
-      path: '/ai-tools/downloader'
-    },
-    {
-      id: 'transcribe_file',
-      title: 'File Transcriber',
-      description: 'Extract text from uploaded video and audio files.',
-      icon: FileText,
-      color: 'text-[#A8C7FA]',
-      bgColor: 'bg-[#0842A0]',
-      status: 'Coming Soon',
-      path: '/ai-tools/transcribe'
+      path: '#'
     }
   ];
 
@@ -88,7 +58,7 @@ export const AiTools: React.FC = () => {
             AI Tools <span className="text-[#A8C7FA]">Suite</span>
           </h1>
           <p className="text-xl text-[#C4C7C5] max-w-2xl mx-auto">
-            We are currently integrating the latest Gemini 2.5 & 3.0 models. These powerful tools will be available shortly.
+            Automate your workflow with our collection of intelligent tools designed for creators and professionals.
           </p>
         </div>
 
@@ -96,25 +66,28 @@ export const AiTools: React.FC = () => {
           {tools.map((tool) => (
             <Card 
               key={tool.id} 
-              className="p-8 border-t-4 border-t-transparent cursor-not-allowed relative overflow-hidden opacity-80 bg-[#1E1F20]/50"
+              className={`p-8 hoverEffect group border-t-4 border-t-transparent hover:border-t-[#A8C7FA] cursor-pointer relative overflow-hidden ${tool.status === 'Coming Soon' ? 'opacity-75' : ''}`}
+              onClick={() => tool.status === 'Active' && navigate(tool.path)}
             >
-              <div className={`w-14 h-14 ${tool.bgColor} rounded-2xl flex items-center justify-center mb-6 border border-white/10 grayscale opacity-70`}>
+              <div className={`w-14 h-14 ${tool.bgColor} rounded-2xl flex items-center justify-center mb-6 border border-white/10`}>
                 <tool.icon className={`w-7 h-7 ${tool.color}`} />
               </div>
               
               <div className="flex justify-between items-start mb-3">
-                <h3 className="text-xl font-bold text-[#8E918F]">{tool.title}</h3>
-                <span className="text-[10px] bg-[#370007] text-[#FFB4AB] px-2 py-1 rounded border border-[#F2B8B5]/20">
-                    Coming Soon
-                </span>
+                <h3 className="text-xl font-bold text-[#E3E3E3]">{tool.title}</h3>
+                {tool.status === 'Coming Soon' && (
+                  <span className="text-[10px] bg-[#1E1F20] text-[#8E918F] px-2 py-1 rounded border border-[#444746]">
+                    Soon
+                  </span>
+                )}
               </div>
               
-              <p className="text-[#5E5E5E] text-sm leading-relaxed mb-6">
+              <p className="text-[#8E918F] text-sm leading-relaxed mb-6">
                 {tool.description}
               </p>
               
-              <div className="flex items-center text-sm font-medium text-[#8E918F]">
-                 <Bell className="w-4 h-4 mr-2" /> Notify Me
+              <div className="flex items-center text-sm font-medium text-[#A8C7FA] group-hover:translate-x-2 transition-transform">
+                {tool.status === 'Active' ? 'Launch Tool' : 'Notify Me'} <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
               </div>
             </Card>
           ))}
