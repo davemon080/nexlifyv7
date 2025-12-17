@@ -277,9 +277,35 @@ export const getProducts = async (): Promise<Product[]> => {
     try {
         return await api<Product[]>('getProducts');
     } catch {
-        // Return dummy data if backend fails
+        // Return dummy data if backend fails - Adding Design and Template examples to test Paystack
         return [
-            { id: 'p1', title: 'Ultimate Freelance Guide', description: 'Offline Guide', category: 'Ebook', price: 5000, imageUrl: 'https://images.unsplash.com/photo-1544716278-ca83adff9d51?auto=format&fit=crop&q=80&w=800', createdAt: new Date().toISOString() }
+            { 
+                id: 'p1', 
+                title: 'Ultimate Freelance Guide', 
+                description: 'Complete guide to starting your freelance journey.', 
+                category: 'Ebook', 
+                price: 5000, 
+                imageUrl: 'https://images.unsplash.com/photo-1544716278-ca83adff9d51?auto=format&fit=crop&q=80&w=800', 
+                createdAt: new Date().toISOString() 
+            },
+            { 
+                id: 'p2', 
+                title: 'Modern Portfolio Template', 
+                description: 'Responsive HTML/CSS template for creatives.', 
+                category: 'Template', 
+                price: 15000, 
+                imageUrl: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&q=80&w=800', 
+                createdAt: new Date().toISOString() 
+            },
+            { 
+                id: 'p3', 
+                title: 'Social Media Kit', 
+                description: 'Pack of 50+ editable Canva designs.', 
+                category: 'Design', 
+                price: 8500, 
+                imageUrl: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=800', 
+                createdAt: new Date().toISOString() 
+            }
         ] as any;
     }
 };

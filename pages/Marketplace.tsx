@@ -79,34 +79,39 @@ export const Marketplace: React.FC = () => {
     if (product.price > 0) {
          const PaystackPop = (window as any).PaystackPop;
          if (!PaystackPop) {
-             alert("Payment system is loading, please try again in a moment.");
+             alert("Payment system is loading, please try again in a moment. Check your internet connection.");
              return;
          }
 
-         const handler = PaystackPop.setup({
-             key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11',
-             email: currentUser.email,
-             amount: product.price * 100, // Amount in kobo
-             currency: 'NGN',
-             ref: ''+Math.floor((Math.random() * 1000000000) + 1),
-             callback: async function(response: any) {
-                 await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
-                 await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
-                 
-                 // Refresh user state to reflect purchase immediately
-                 const updatedUser = getCurrentUser();
-                 setUser(updatedUser);
+         try {
+             const handler = PaystackPop.setup({
+                 key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11', // Explicitly set public key
+                 email: currentUser.email,
+                 amount: product.price * 100, // Amount in kobo
+                 currency: 'NGN',
+                 ref: ''+Math.floor((Math.random() * 1000000000) + 1),
+                 callback: async function(response: any) {
+                     await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
+                     await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
+                     
+                     // Refresh user state to reflect purchase immediately
+                     const updatedUser = getCurrentUser();
+                     setUser(updatedUser);
 
-                 alert("Payment successful! Downloading your file...");
-                 handleDownload(product);
-             },
-             onClose: function() {
-                 alert('Transaction was not completed.');
-             },
-         });
-         handler.openIframe();
+                     alert("Payment successful! Downloading your file...");
+                     handleDownload(product);
+                 },
+                 onClose: function() {
+                     alert('Transaction was not completed.');
+                 },
+             });
+             handler.openIframe();
+         } catch (error) {
+             console.error("Paystack Error:", error);
+             alert("An error occurred initializing payment. Please try again.");
+         }
     } else {
-         // Free product logic could essentially be a download or a "buy for 0"
+         // Free product logic
          handleDownload(product);
     }
   };
