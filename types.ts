@@ -2,7 +2,8 @@ export enum ProductCategory {
   EBOOK = 'Ebook',
   TEMPLATE = 'Template',
   COURSE = 'Course',
-  GUIDE = 'Guide'
+  GUIDE = 'Guide',
+  DESIGN = 'Design'
 }
 
 export interface Product {
