@@ -33,32 +33,46 @@ export const VideoDownloader: React.FC = () => {
     setStatusText('Connecting to server...');
 
     try {
-        // We use Cobalt API (free, open source) for extraction
-        // Note: In a production app, you should host your own instance of cobalt
-        const response = await fetch('https://api.cobalt.tools/api/json', {
-            method: 'POST',
+        // Construct API URL with query parameters
+        // We use format=mp4 to ensure we get video, not audio.
+        const encodedUrl = encodeURIComponent(url);
+        const apiUrl = `https://youtube-info-download-api.p.rapidapi.com/ajax/download.php?format=mp4&add_info=0&url=${encodedUrl}&allow_extended_duration=false&no_merge=false`;
+
+        const response = await fetch(apiUrl, {
+            method: 'GET',
             headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url: url,
-                vCodec: 'h264',
-                vQuality: '1080',
-                aFormat: 'mp3',
-                filenamePattern: 'basic'
-            })
+                'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
+                'x-rapidapi-key': 'd65a7a1b87mshafe5687993d6894p101c7ajsn6d7c8469650c'
+            }
         });
 
-        const data = await response.json();
-
-        if (data.status === 'error') {
-            throw new Error(data.text || 'Could not process video');
+        if (!response.ok) {
+             throw new Error(`API Error: ${response.statusText}`);
         }
 
-        // Cobalt sometimes returns a direct stream url or a picker
-        // We normalize the result for our UI
-        const videoUrl = data.url;
+        const data = await response.json();
+        
+        if (data.status === 'error' || data.error) {
+            throw new Error(data.message || data.error || 'Could not process video');
+        }
+
+        // Heuristic to find the URL in the response
+        // Common RapidAPI patterns: data.url, data.link, data.result.url, data.download_url
+        let videoUrl = data.url || data.link || data.download_url;
+        
+        // Sometimes data itself is the url if text/plain (unlikely for json fetch)
+        if (!videoUrl && data.result && typeof data.result === 'string') videoUrl = data.result;
+        if (!videoUrl && data.result && data.result.url) videoUrl = data.result.url;
+
+        // Fallback checks
+        if (!videoUrl) {
+            if (data.formats && data.formats.length > 0) {
+                videoUrl = data.formats[0].url;
+            } else {
+                 throw new Error('No download URL found in API response. The video might be private or restricted.');
+            }
+        }
+
         const platform = getPlatform(url);
         
         // Simulate "Processing" time for better UX if API is too fast
@@ -66,12 +80,10 @@ export const VideoDownloader: React.FC = () => {
         await new Promise(r => setTimeout(r, 800));
 
         setResult({
-            title: data.filename || `Downloaded ${platform} Video`,
-            thumbnail: `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${new URL(url).origin}&size=128`, // Generic favicon as thumb since API might not return one
+            title: data.title || data.filename || `Downloaded ${platform} Video`,
+            thumbnail: data.thumb || data.thumbnail || `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${new URL(url).origin}&size=128`, // Generic favicon/thumb fallback
             source: platform,
             downloadUrl: videoUrl,
-            // Cobalt typically gives one best stream. We mock "formats" to give the user the illusion of choice, 
-            // though for this demo we'll just link the main one or try to modify it if the API supported it.
             formats: [
                 { quality: 'Best Available', size: 'Unknown', type: 'mp4', url: videoUrl }
             ]
@@ -302,7 +314,7 @@ export const VideoDownloader: React.FC = () => {
         )}
 
         <div className="mt-8 text-center text-xs text-[#5E5E5E]">
-            Powered by Cobalt API. This tool is for educational purposes only. Please respect copyright laws.
+            Powered by RapidAPI. This tool is for educational purposes only. Please respect copyright laws.
         </div>
       </div>
     </div>
