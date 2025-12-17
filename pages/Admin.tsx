@@ -479,6 +479,16 @@ export const Admin: React.FC = () => {
                         
                         <div className="space-y-2">
                             <label className="block text-sm font-medium text-[#C4C7C5] ml-1">App Logo</label>
+                            
+                            <div className="mb-4">
+                                <Input 
+                                    placeholder="https://example.com/logo.png" 
+                                    value={appSettings.logoUrl || ''} 
+                                    onChange={(e) => setAppSettings({...appSettings, logoUrl: e.target.value})}
+                                />
+                                <p className="text-xs text-[#8E918F] mt-1 ml-1">Paste a direct image URL or upload a file below.</p>
+                            </div>
+
                             <div className="flex items-center gap-6">
                                 <div className="w-24 h-24 rounded-full bg-[#131314] border border-[#444746] flex items-center justify-center overflow-hidden">
                                     {appSettings.logoUrl ? (

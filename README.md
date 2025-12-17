@@ -100,6 +100,25 @@ CREATE TABLE IF NOT EXISTS activity_logs (
 );
 ```
 
+### Updates for Existing Databases
+If you already have tables, run these specific commands to update your schema:
+
+```sql
+-- Add photo_url to users table
+ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+
+-- Create app_settings table
+CREATE TABLE IF NOT EXISTS app_settings (
+  id INT PRIMARY KEY DEFAULT 1,
+  platform_name TEXT DEFAULT 'Nexlify',
+  logo_url TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default settings row
+INSERT INTO app_settings (id, platform_name) VALUES (1, 'Nexlify') ON CONFLICT (id) DO NOTHING;
+```
+
 ## Local Development
 1. Create a `.env` file in the root directory with all variables listed in section 2.
 2. Run `npm run dev` or `vercel dev`.
