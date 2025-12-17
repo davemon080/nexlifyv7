@@ -3,12 +3,18 @@ import { EARNING_METHODS } from '../services/mockData';
 import { Card, Button, Badge } from '../components/UI';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Users, Briefcase, MousePointer, ArrowRight, Zap } from 'lucide-react';
+import { SEO } from '../components/SEO';
 
 export const Earn: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title="Earn Money Online - Freelance & Referrals" 
+        description="Join thousands of users earning daily on Nexlify through micro-tasks, freelance gigs, and our referral program."
+        keywords="earn money online, freelance nigeria, referral program, micro tasks, nexlify earn"
+      />
       {/* Hero */}
       <div className="relative overflow-hidden bg-[#1E1F20] py-24 px-4 border-b border-[#444746]">
         {/* Abstract Background */}

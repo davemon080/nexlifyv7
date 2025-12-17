@@ -3,6 +3,7 @@ import { submitInquiry } from '../services/mockData';
 import { Button, Input, Textarea, Card } from '../components/UI';
 import { SERVICES_LIST } from '../services/mockData';
 import { CheckCircle, Send, MessageCircle } from 'lucide-react';
+import { SEO } from '../components/SEO';
 
 export const Hire: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -37,6 +38,7 @@ export const Hire: React.FC = () => {
   if (success) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4">
+        <SEO title="Request Received | Nexlify" />
         <Card className="max-w-md w-full p-10 text-center bg-[#1E1F20]">
           <div className="w-20 h-20 bg-[#0F5223] rounded-full flex items-center justify-center mx-auto mb-8 border border-[#6DD58C]/30">
             <CheckCircle className="w-10 h-10 text-[#6DD58C]" />
@@ -55,6 +57,11 @@ export const Hire: React.FC = () => {
 
   return (
     <div className="py-20 px-4 sm:px-6 lg:px-8">
+      <SEO 
+        title="Hire Us - Digital Agency Services" 
+        description="Looking for web development, branding, or digital marketing services? Hire Nexlify experts to bring your vision to life."
+        keywords="hire developers, digital agency, web design service, marketing agency, nexlify hire"
+      />
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold text-[#E3E3E3] mb-6">Hire Us</h1>

@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings, getAdminStats } from '../services/mockData';
-import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion, AppSettings } from '../types';
+import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion, AppSettings, PageSeoConfig } from '../types';
 import { Button, Input, Card, Badge, Textarea } from '../components/UI';
-import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle, Settings, Save, BarChart3, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle, Settings, Save, BarChart3, TrendingUp, Globe, Link as LinkIcon, Eye } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'products' | 'inquiries' | 'training' | 'users' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'inquiries' | 'training' | 'users' | 'settings' | 'seo'>('products');
   const [products, setProducts] = useState<Product[]>([]);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -43,6 +43,23 @@ export const Admin: React.FC = () => {
   const [currentCourse, setCurrentCourse] = useState<Partial<Course>>({
       title: '', description: '', thumbnail: '', level: 'Beginner', duration: '', price: 0, instructor: '', modules: []
   });
+
+  // SEO Management State
+  const [selectedSeoPage, setSelectedSeoPage] = useState<string>('/');
+  const [seoForm, setSeoForm] = useState<PageSeoConfig>({
+      path: '/', title: '', description: '', keywords: '', ogImage: ''
+  });
+  
+  const knownRoutes = [
+      { path: '/', name: 'Home Page' },
+      { path: '/market', name: 'Marketplace' },
+      { path: '/training', name: 'Training Academy' },
+      { path: '/hire', name: 'Hire Us / Services' },
+      { path: '/earn', name: 'Earn / Freelance' },
+      { path: '/ai-tools', name: 'AI Tools Hub' },
+      { path: '/login', name: 'Login Page' },
+      { path: '/register', name: 'Register Page' }
+  ];
 
   useEffect(() => {
     const isAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -84,7 +101,8 @@ export const Admin: React.FC = () => {
           users,
           products,
           inquiries,
-          courses
+          courses,
+          appSettings
       };
 
       const dataStr = JSON.stringify(dbData, null, 2);
@@ -114,6 +132,28 @@ export const Admin: React.FC = () => {
   const handleSaveSettings = () => {
       updateAppSettings(appSettings);
       alert("Settings saved successfully!");
+  };
+
+  // --- SEO HANDLERS ---
+  const handleSeoPageChange = (path: string) => {
+      setSelectedSeoPage(path);
+      // Try to find existing config
+      const existing = appSettings.seoDefinitions?.[path];
+      if (existing) {
+          setSeoForm(existing);
+      } else {
+          setSeoForm({ path, title: '', description: '', keywords: '', ogImage: '' });
+      }
+  };
+
+  const handleSaveSeo = () => {
+      const updatedSeoDefs = { ...(appSettings.seoDefinitions || {}) };
+      updatedSeoDefs[seoForm.path] = seoForm;
+      const updatedSettings = { ...appSettings, seoDefinitions: updatedSeoDefs };
+      
+      setAppSettings(updatedSettings);
+      updateAppSettings(updatedSettings);
+      alert(`SEO settings for ${seoForm.path} saved!`);
   };
 
   // --- USER HANDLERS ---
@@ -449,6 +489,9 @@ export const Admin: React.FC = () => {
                 <button onClick={() => setActiveTab('training')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'training' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
                     <GraduationCap className="w-4 h-4 mr-2" /> Training
                 </button>
+                 <button onClick={() => setActiveTab('seo')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'seo' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
+                    <Globe className="w-4 h-4 mr-2" /> SEO Manager
+                </button>
                 <button onClick={() => setActiveTab('settings')} className={`flex items-center px-6 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5] hover:bg-[#444746]'}`}>
                     <Settings className="w-4 h-4 mr-2" /> Settings
                 </button>
@@ -501,6 +544,84 @@ export const Admin: React.FC = () => {
 
                         <div className="pt-6 border-t border-[#444746] flex justify-end">
                             <Button onClick={handleSaveSettings} icon={Save}>Save Changes</Button>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+        )}
+
+        {/* --- SEO MANAGER TAB --- */}
+        {activeTab === 'seo' && (
+            <div className="max-w-4xl mx-auto">
+                <Card className="p-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start mb-8 gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-[#E3E3E3] flex items-center gap-2"><Globe className="w-5 h-5 text-[#A8C7FA]" /> WordPress-Style SEO Manager</h2>
+                            <p className="text-[#8E918F] text-sm mt-1">Manage titles, meta descriptions, and keywords for your pages.</p>
+                        </div>
+                        <div className="w-full md:w-auto">
+                            <select 
+                                className="w-full md:w-64 rounded-2xl bg-[#131314] border border-[#444746] px-4 py-2 text-[#E3E3E3] outline-none focus:border-[#A8C7FA]"
+                                value={selectedSeoPage}
+                                onChange={(e) => handleSeoPageChange(e.target.value)}
+                            >
+                                {knownRoutes.map(route => (
+                                    <option key={route.path} value={route.path}>{route.name} ({route.path})</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="md:col-span-2 space-y-6">
+                            <Input 
+                                label="Meta Title" 
+                                placeholder="e.g., Home | Nexlify Digital Platform"
+                                value={seoForm.title}
+                                onChange={(e) => setSeoForm({...seoForm, title: e.target.value})}
+                            />
+                             <div className="relative">
+                                <label className="block text-sm font-medium text-[#C4C7C5] mb-2 ml-1">Meta Description</label>
+                                <textarea
+                                    className="w-full rounded-2xl bg-[#1E1F20] border border-[#444746] px-5 py-3 text-[#E3E3E3] placeholder-[#8E918F] focus:border-[#A8C7FA] focus:ring-1 focus:ring-[#A8C7FA] transition-all outline-none"
+                                    rows={4}
+                                    placeholder="A brief summary of the page content for search engines..."
+                                    value={seoForm.description}
+                                    onChange={(e) => setSeoForm({...seoForm, description: e.target.value})}
+                                />
+                                <div className={`text-xs mt-1 text-right ${seoForm.description.length > 160 ? 'text-[#CF6679]' : 'text-[#8E918F]'}`}>
+                                    {seoForm.description.length} / 160 recommended
+                                </div>
+                            </div>
+                            <Input 
+                                label="Keywords (Comma separated)" 
+                                placeholder="e.g., marketplace, digital, ai tools"
+                                value={seoForm.keywords}
+                                onChange={(e) => setSeoForm({...seoForm, keywords: e.target.value})}
+                            />
+                            
+                            <div className="pt-4 flex justify-end">
+                                <Button onClick={handleSaveSeo} icon={Save}>Save SEO Settings</Button>
+                            </div>
+                        </div>
+
+                        {/* Google Preview */}
+                        <div className="bg-[#131314] p-4 rounded-xl border border-[#444746]">
+                            <h4 className="text-[#E3E3E3] font-bold mb-4 flex items-center gap-2"><Eye className="w-4 h-4" /> Search Preview</h4>
+                            <div className="bg-white p-4 rounded-lg font-sans">
+                                <div className="text-[#1a0dab] text-lg hover:underline cursor-pointer truncate">
+                                    {seoForm.title || `${appSettings.platformName} - Page Title`}
+                                </div>
+                                <div className="text-[#006621] text-sm flex items-center gap-1 mb-1">
+                                    https://nexlify.com.ng{seoForm.path}
+                                </div>
+                                <div className="text-[#545454] text-sm line-clamp-2">
+                                    {seoForm.description || "This is how your page will appear in Google search results. Add a description to improve click-through rates."}
+                                </div>
+                            </div>
+                            <p className="text-xs text-[#8E918F] mt-4 text-center">
+                                *Preview is an approximation. Actual display may vary.
+                            </p>
                         </div>
                     </div>
                 </Card>

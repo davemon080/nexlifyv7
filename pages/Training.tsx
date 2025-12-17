@@ -4,6 +4,7 @@ import { getCourses, getCurrentUser } from '../services/mockData';
 import { Course, User } from '../types';
 import { Card, Button, Badge } from '../components/UI';
 import { Calendar, Clock, BookOpen, ArrowRight, PlayCircle } from 'lucide-react';
+import { SEO } from '../components/SEO';
 
 export const Training: React.FC = () => {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -25,6 +26,11 @@ export const Training: React.FC = () => {
 
   return (
     <div className="min-h-screen">
+      <SEO 
+        title="Training Academy - Master Digital Skills" 
+        description="Enroll in intensive online bootcamps and courses. Learn web development, graphic design, and digital marketing."
+        keywords="online courses, web development training, graphic design course, learn coding, nexlify academy"
+      />
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-[#1E1F20] py-20 border-b border-[#444746]">
         <div className="absolute top-0 left-0 w-[500px] h-[500px] bg-[#9B72CB] opacity-10 blur-[120px] rounded-full pointer-events-none"></div>

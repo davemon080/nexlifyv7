@@ -1,3 +1,4 @@
+
 export enum ProductCategory {
   EBOOK = 'Ebook',
   TEMPLATE = 'Template',
@@ -6,9 +7,20 @@ export enum ProductCategory {
   DESIGN = 'Design'
 }
 
+export interface PageSeoConfig {
+  path: string; // The route path (e.g., '/', '/market', '/hire')
+  title: string;
+  description: string;
+  keywords: string;
+  ogImage?: string;
+}
+
 export interface AppSettings {
   logoUrl?: string;
   platformName: string;
+  // Map path -> SEO Config
+  seoDefinitions?: Record<string, PageSeoConfig>; 
+  defaultSeo?: PageSeoConfig;
 }
 
 export interface Product {

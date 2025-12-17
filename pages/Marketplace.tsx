@@ -4,6 +4,7 @@ import { Product, ProductCategory, User } from '../types';
 import { Button, Card, Badge } from '../components/UI';
 import { Search, Filter, Download, ShoppingCart, Loader2, Eye, X, Share2, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { SEO } from '../components/SEO';
 
 export const Marketplace: React.FC = () => {
   const navigate = useNavigate();
@@ -190,6 +191,11 @@ export const Marketplace: React.FC = () => {
 
   return (
     <div className="min-h-screen pb-12">
+      <SEO 
+        title="Digital Marketplace - Buy Templates & Ebooks" 
+        description="Discover premium digital resources, ebooks, website templates, and design assets to accelerate your growth."
+        keywords="ebooks, website templates, digital downloads, nexlify marketplace, buy themes"
+      />
       <div className="border-b border-[#444746] bg-[#1E1F20]/50 py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <Badge color="purple">Digital Store</Badge>

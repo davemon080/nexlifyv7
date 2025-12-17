@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { SERVICES_LIST } from '../services/mockData';
 import { Button, Card, Badge } from '../components/UI';
 import { ArrowRight, Code, Megaphone, PenTool, FileText, CheckCircle, Sparkles, Stars } from 'lucide-react';
+import { SEO } from '../components/SEO';
 
 const iconMap: Record<string, any> = {
   'code': Code,
@@ -16,6 +17,11 @@ export const Home: React.FC = () => {
 
   return (
     <div className="space-y-16 md:space-y-24 pb-20">
+      <SEO 
+        title="Nexlify - Hub for Digital Intelligence & Growth" 
+        description="Connect with top-tier digital services, access premium resources, and unlock opportunities to earn. Built for the future of digital work."
+        keywords="digital platform, freelance services, online courses, marketplace, earn money online"
+      />
       {/* Hero Section */}
       <section className="relative overflow-hidden min-h-[85vh] flex items-center">
         {/* Background Gradients */}
