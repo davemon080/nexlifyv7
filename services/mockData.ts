@@ -118,7 +118,7 @@ export const registerUser = async (name: string, email: string, password: string
 
         const newUser: User = { 
             id, name, email, password, role: finalRole, 
-            balance: 0, joinedAt: new Date().toISOString(), status: 'active', enrolledCourses: [] 
+            balance: 0, joinedAt: new Date().toISOString(), status: 'active', enrolledCourses: [], purchasedProducts: [] 
         };
         
         users.push(newUser);
@@ -143,7 +143,7 @@ export const loginUser = async (email: string, password: string): Promise<User> 
         if (!user) {
             // Check if admin fallback
             if(email === 'admin@nexlify.com' && password === 'admin') {
-                return { id: 'admin-local', name: 'Local Admin', email, role: 'admin', balance: 999999, joinedAt: new Date().toISOString(), status: 'active', enrolledCourses: [] };
+                return { id: 'admin-local', name: 'Local Admin', email, role: 'admin', balance: 999999, joinedAt: new Date().toISOString(), status: 'active', enrolledCourses: [], purchasedProducts: [] };
             }
             throw new Error('Invalid credentials (Local Mode). Ensure you have registered locally if backend is offline.');
         }
@@ -243,8 +243,31 @@ export const getUserActivity = async (userId: string): Promise<ActivityLog[]> =>
 export const recordTransaction = async (userId: string, type: 'course_enrollment' | 'product_purchase', itemId: string, amount: number, reference: string) => {
     try {
         await api('recordTransaction', 'POST', { userId, type, itemId, amount, reference });
+        
+        // After success, we need to update the local current user session to reflect the purchase immediately
+        const currentUser = getCurrentUser();
+        if(currentUser && currentUser.id === userId) {
+            if(type === 'product_purchase') {
+                const updatedPurchases = [...(currentUser.purchasedProducts || []), itemId];
+                const updatedUser = { ...currentUser, purchasedProducts: updatedPurchases };
+                localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+            } else if (type === 'course_enrollment') {
+                const updatedEnrollments = [...(currentUser.enrolledCourses || []), itemId];
+                const updatedUser = { ...currentUser, enrolledCourses: updatedEnrollments };
+                localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+            }
+        }
+
     } catch (e) {
         console.warn("Failed to record transaction to DB", e);
+    }
+};
+
+export const getAdminStats = async () => {
+    try {
+        return await api<{totalRevenue: number}>('getAdminStats');
+    } catch {
+        return { totalRevenue: 0 };
     }
 };
 

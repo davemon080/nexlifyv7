@@ -42,6 +42,7 @@ export interface User {
   balance: number;
   joinedAt: string;
   enrolledCourses?: string[]; // IDs of courses
+  purchasedProducts?: string[]; // IDs of products
   status?: 'active' | 'suspended' | 'banned';
   photoUrl?: string;
 }

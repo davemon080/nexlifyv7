@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getProducts, logUserActivity, getCurrentUser, recordTransaction } from '../services/mockData';
-import { Product, ProductCategory } from '../types';
+import { Product, ProductCategory, User } from '../types';
 import { Button, Card, Badge } from '../components/UI';
-import { Search, Filter, Download, ShoppingCart, Loader2, Eye, X, Share2, Copy } from 'lucide-react';
+import { Search, Filter, Download, ShoppingCart, Loader2, Eye, X, Share2, Copy, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const Marketplace: React.FC = () => {
@@ -13,8 +13,10 @@ export const Marketplace: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
+    setUser(getCurrentUser());
     loadProducts();
   }, []);
 
@@ -44,9 +46,14 @@ export const Marketplace: React.FC = () => {
     setFilteredProducts(result);
   };
 
+  const isPurchased = (productId: string) => {
+      if(!user) return false;
+      return user.purchasedProducts?.includes(productId);
+  };
+
   const handleDownload = (product: Product) => {
-    const user = getCurrentUser();
-    if(user) logUserActivity(user.id, 'Download', `Downloaded product: ${product.title}`, 'info');
+    const currentUser = getCurrentUser();
+    if(currentUser) logUserActivity(currentUser.id, 'Download', `Downloaded product: ${product.title}`, 'info');
 
     if (product.downloadUrl) {
       // Create a temporary link to download the file (which is a data URI)
@@ -62,8 +69,8 @@ export const Marketplace: React.FC = () => {
   };
 
   const handlePurchase = (product: Product) => {
-    const user = getCurrentUser();
-    if (!user) {
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
         alert("You must be logged in to purchase products.");
         navigate('/login');
         return;
@@ -78,15 +85,18 @@ export const Marketplace: React.FC = () => {
 
          const handler = PaystackPop.setup({
              key: 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11',
-             email: user.email,
+             email: currentUser.email,
              amount: product.price * 100, // Amount in kobo
              currency: 'NGN',
              ref: ''+Math.floor((Math.random() * 1000000000) + 1),
              callback: async function(response: any) {
-                 await recordTransaction(user.id, 'product_purchase', product.id, product.price, response.reference);
-                 await logUserActivity(user.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
-                 alert("Payment successful! Downloading file...");
-                 handleDownload(product);
+                 await recordTransaction(currentUser.id, 'product_purchase', product.id, product.price, response.reference);
+                 await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${product.price}`, 'success');
+                 alert("Payment successful! You can now download the file.");
+                 
+                 // Refresh user state to reflect purchase immediately
+                 const updatedUser = getCurrentUser();
+                 setUser(updatedUser);
              },
              onClose: function() {
                  alert('Transaction was not completed.');
@@ -94,6 +104,7 @@ export const Marketplace: React.FC = () => {
          });
          handler.openIframe();
     } else {
+         // Free product logic could essentially be a download or a "buy for 0"
          handleDownload(product);
     }
   };
@@ -176,7 +187,9 @@ export const Marketplace: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-            {filteredProducts.map((product) => (
+            {filteredProducts.map((product) => {
+              const owned = isPurchased(product.id);
+              return (
               <Card key={product.id} className="flex flex-col h-full hoverEffect group">
                 <div className="relative aspect-[4/3] overflow-hidden bg-[#131314] border-b border-[#444746] cursor-pointer" onClick={() => setPreviewProduct(product)}>
                   <img 
@@ -197,9 +210,13 @@ export const Marketplace: React.FC = () => {
                       </button>
                   </div>
                   <div className="absolute top-3 right-3">
-                    <Badge color={product.price === 0 ? 'green' : 'blue'}>
-                      {product.price === 0 ? 'FREE' : `₦${product.price.toLocaleString()}`}
-                    </Badge>
+                    {owned ? (
+                        <Badge color="green"><div className="flex items-center gap-1"><Check className="w-3 h-3"/> Owned</div></Badge>
+                    ) : (
+                        <Badge color={product.price === 0 ? 'green' : 'blue'}>
+                          {product.price === 0 ? 'FREE' : `₦${product.price.toLocaleString()}`}
+                        </Badge>
+                    )}
                   </div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col">
@@ -213,18 +230,28 @@ export const Marketplace: React.FC = () => {
                     {product.description}
                   </p>
                   <div className="flex gap-2 mt-auto">
-                    <Button 
-                        className="flex-1" 
-                        variant={product.price === 0 ? 'secondary' : 'primary'}
-                        icon={product.price === 0 ? Download : ShoppingCart}
-                        onClick={() => product.price === 0 ? handleDownload(product) : handlePurchase(product)}
-                    >
-                        {product.price === 0 ? 'Get' : 'Buy'}
-                    </Button>
+                    {owned ? (
+                        <Button 
+                            className="flex-1 bg-[#0F5223] text-[#C4EED0] hover:bg-[#136C2E]" 
+                            icon={Download}
+                            onClick={() => handleDownload(product)}
+                        >
+                            Download
+                        </Button>
+                    ) : (
+                        <Button 
+                            className="flex-1" 
+                            variant={product.price === 0 ? 'secondary' : 'primary'}
+                            icon={product.price === 0 ? Download : ShoppingCart}
+                            onClick={() => product.price === 0 ? handleDownload(product) : handlePurchase(product)}
+                        >
+                            {product.price === 0 ? 'Get' : 'Buy'}
+                        </Button>
+                    )}
                   </div>
                 </div>
               </Card>
-            ))}
+            )})}
           </div>
         )}
         
@@ -280,20 +307,31 @@ export const Marketplace: React.FC = () => {
                         <div className="text-sm text-[#8E918F] hidden sm:block">
                             {previewProduct.description}
                         </div>
-                        <Button 
-                            variant={previewProduct.price === 0 ? 'secondary' : 'primary'}
-                            icon={previewProduct.price === 0 ? Download : ShoppingCart}
-                            onClick={() => {
-                                if (previewProduct.price === 0) {
-                                    handleDownload(previewProduct);
-                                } else {
-                                    handlePurchase(previewProduct);
-                                    setPreviewProduct(null); // Close modal on purchase flow
-                                }
-                            }}
-                        >
-                            {previewProduct.price === 0 ? 'Download Template' : `Buy Template (₦${previewProduct.price.toLocaleString()})`}
-                        </Button>
+                        
+                        {isPurchased(previewProduct.id) ? (
+                            <Button 
+                                className="bg-[#0F5223] text-[#C4EED0] hover:bg-[#136C2E]" 
+                                icon={Download}
+                                onClick={() => handleDownload(previewProduct)}
+                            >
+                                Download Owned Item
+                            </Button>
+                        ) : (
+                            <Button 
+                                variant={previewProduct.price === 0 ? 'secondary' : 'primary'}
+                                icon={previewProduct.price === 0 ? Download : ShoppingCart}
+                                onClick={() => {
+                                    if (previewProduct.price === 0) {
+                                        handleDownload(previewProduct);
+                                    } else {
+                                        handlePurchase(previewProduct);
+                                        setPreviewProduct(null); // Close modal on purchase flow
+                                    }
+                                }}
+                            >
+                                {previewProduct.price === 0 ? 'Download Template' : `Buy Template (₦${previewProduct.price.toLocaleString()})`}
+                            </Button>
+                        )}
                   </div>
               </div>
           </div>

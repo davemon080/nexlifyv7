@@ -56,6 +56,14 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Purchases Table (Tracks ownership of products)
+CREATE TABLE IF NOT EXISTS purchases (
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
+  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, product_id)
+);
+
 -- Courses Table (Using JSONB for modules)
 CREATE TABLE IF NOT EXISTS courses (
   id TEXT PRIMARY KEY,
@@ -119,14 +127,13 @@ If you already have tables, run these specific commands to update your schema:
 -- Add photo_url to users table
 ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
 
--- Create app_settings table
-CREATE TABLE IF NOT EXISTS app_settings (
-  id INT PRIMARY KEY DEFAULT 1,
-  platform_name TEXT DEFAULT 'Nexlify',
-  logo_url TEXT,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Create purchases table
+CREATE TABLE IF NOT EXISTS purchases (
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
+  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, product_id)
 );
-INSERT INTO app_settings (id, platform_name) VALUES (1, 'Nexlify') ON CONFLICT (id) DO NOTHING;
 
 -- Create transactions table
 CREATE TABLE IF NOT EXISTS transactions (

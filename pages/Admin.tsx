@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings } from '../services/mockData';
+import { getProducts, getInquiries, addProduct, deleteProduct, updateProduct, getCourses, getAllUsers, updateUser, deleteUser, getUserActivity, addCourse, updateCourse, deleteCourse, adminEnrollUser, getAppSettings, updateAppSettings, getAdminStats } from '../services/mockData';
 import { Product, Inquiry, ProductCategory, Course, User, ActivityLog, Module, Lesson, QuizQuestion, AppSettings } from '../types';
 import { Button, Input, Card, Badge, Textarea } from '../components/UI';
 import { Plus, Trash2, Mail, LayoutGrid, GraduationCap, Loader2, Users, Wallet, Calendar, Search, MoreVertical, Shield, Clock, X, Check, AlertTriangle, Upload, FileText, Download, Edit, Video, ChevronDown, ChevronUp, GripVertical, Gift, HelpCircle, Settings, Save, BarChart3, TrendingUp } from 'lucide-react';
@@ -15,6 +15,7 @@ export const Admin: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>({ platformName: 'Nexlify' });
   const [showProductModal, setShowProductModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [totalRevenue, setTotalRevenue] = useState(0);
 
   // User Management State
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -55,35 +56,26 @@ export const Admin: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [pData, iData, cData, uData, settings] = await Promise.all([
+      const [pData, iData, cData, uData, settings, stats] = await Promise.all([
         getProducts(),
         getInquiries(),
         getCourses(),
         getAllUsers(),
-        getAppSettings()
+        getAppSettings(),
+        getAdminStats()
       ]);
       setProducts(pData);
       setInquiries(iData);
       setCourses(cData);
       setUsers(uData);
       setAppSettings(settings);
+      setTotalRevenue(stats.totalRevenue);
     } catch (error) {
       console.error("Failed to load admin data", error);
     } finally {
       setLoading(false);
     }
   };
-
-  // --- STATISTICS CALCULATION ---
-  const totalRevenue = users.reduce((acc, user) => {
-    if(!user.enrolledCourses) return acc;
-    // Calculate value of courses user is enrolled in
-    const userValue = user.enrolledCourses.reduce((sum, cId) => {
-        const course = courses.find(c => c.id === cId);
-        return sum + (course?.price || 0);
-    }, 0);
-    return acc + userValue;
-  }, 0);
 
   // --- DATABASE EXPORT LOGIC ---
   const handleExportDatabase = () => {

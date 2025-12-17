@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, updateUser, changePassword } from '../services/mockData';
-import { User } from '../types';
+import { getCurrentUser, updateUser, changePassword, getCourses, getProducts } from '../services/mockData';
+import { User, Course, Product } from '../types';
 import { Card, Button, Badge, Input } from '../components/UI';
-import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings, X, Save, Lock, Camera, Upload } from 'lucide-react';
+import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings, X, Save, Lock, Camera, Upload, Download, ShoppingBag } from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [enrolledCoursesData, setEnrolledCoursesData] = useState<Course[]>([]);
+  const [purchasedProductsData, setPurchasedProductsData] = useState<Product[]>([]);
   const [showSettings, setShowSettings] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', email: '' });
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
@@ -20,8 +22,25 @@ export const Profile: React.FC = () => {
     } else {
       setUser(currentUser);
       setEditForm({ name: currentUser.name, email: currentUser.email });
+      loadUserAssets(currentUser);
     }
   }, [navigate]);
+
+  const loadUserAssets = async (currentUser: User) => {
+      // Load Courses
+      if (currentUser.enrolledCourses && currentUser.enrolledCourses.length > 0) {
+          const allCourses = await getCourses();
+          const userCourses = allCourses.filter(c => currentUser.enrolledCourses?.includes(c.id));
+          setEnrolledCoursesData(userCourses);
+      }
+      
+      // Load Products
+      if (currentUser.purchasedProducts && currentUser.purchasedProducts.length > 0) {
+          const allProducts = await getProducts();
+          const userProducts = allProducts.filter(p => currentUser.purchasedProducts?.includes(p.id));
+          setPurchasedProductsData(userProducts);
+      }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
@@ -93,6 +112,19 @@ export const Profile: React.FC = () => {
         alert(error.message || 'Failed to change password');
     } finally {
         setIsLoading(false);
+    }
+  };
+
+  const handleDownloadProduct = (product: Product) => {
+    if (product.downloadUrl) {
+      const link = document.createElement('a');
+      link.href = product.downloadUrl;
+      link.download = `${product.title.replace(/\s+/g, '_')}${product.category === 'Ebook' ? '.pdf' : '.zip'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+        alert("Preparing download...");
     }
   };
 
@@ -168,27 +200,56 @@ export const Profile: React.FC = () => {
               <h3 className="text-xl font-bold text-[#E3E3E3] mb-4 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-[#A8C7FA]" /> My Learning
               </h3>
-              {user.enrolledCourses && user.enrolledCourses.length > 0 ? (
+              {enrolledCoursesData.length > 0 ? (
                 <div className="grid gap-4">
-                  {/* Mock implementation based on IDs */}
-                  <Card className="p-6 flex items-center justify-between group hover:bg-[#2D2E30] transition-colors cursor-pointer" onClick={() => navigate('/classroom/c-web-dev')}>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-[#131314] rounded-lg flex items-center justify-center text-[#A8C7FA]">
-                        <BookOpen className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-[#E3E3E3] group-hover:text-[#A8C7FA] transition-colors">Web Development Bootcamp</h4>
-                        <p className="text-xs text-[#8E918F]">In Progress</p>
-                      </div>
-                    </div>
-                    <Badge color="blue">Continue</Badge>
-                  </Card>
+                  {enrolledCoursesData.map(course => (
+                      <Card key={course.id} className="p-6 flex items-center justify-between group hover:bg-[#2D2E30] transition-colors cursor-pointer" onClick={() => navigate(`/classroom/${course.id}`)}>
+                        <div className="flex items-center gap-4">
+                          <img src={course.thumbnail} alt={course.title} className="w-12 h-12 rounded-lg object-cover bg-[#131314]" />
+                          <div>
+                            <h4 className="font-bold text-[#E3E3E3] group-hover:text-[#A8C7FA] transition-colors">{course.title}</h4>
+                            <p className="text-xs text-[#8E918F]">3 Modules • In Progress</p>
+                          </div>
+                        </div>
+                        <Badge color="blue">Continue</Badge>
+                      </Card>
+                  ))}
                 </div>
               ) : (
                 <Card className="p-8 text-center border-dashed border-[#444746]">
                   <p className="text-[#8E918F] mb-4">You haven't enrolled in any courses yet.</p>
                   <Button variant="outline" onClick={() => navigate('/training')}>Browse Courses</Button>
                 </Card>
+              )}
+            </div>
+            
+            {/* My Downloads */}
+            <div>
+              <h3 className="text-xl font-bold text-[#E3E3E3] mb-4 flex items-center gap-2">
+                <ShoppingBag className="w-5 h-5 text-[#9B72CB]" /> My Downloads
+              </h3>
+              {purchasedProductsData.length > 0 ? (
+                  <div className="grid gap-4">
+                      {purchasedProductsData.map(product => (
+                          <Card key={product.id} className="p-6 flex items-center justify-between hover:bg-[#2D2E30] transition-colors">
+                            <div className="flex items-center gap-4">
+                                <img src={product.imageUrl} alt={product.title} className="w-12 h-12 rounded-lg object-cover bg-[#131314]" />
+                                <div>
+                                    <h4 className="font-bold text-[#E3E3E3]">{product.title}</h4>
+                                    <p className="text-xs text-[#8E918F]">{product.category}</p>
+                                </div>
+                            </div>
+                            <Button size="sm" icon={Download} variant="outline" onClick={() => handleDownloadProduct(product)}>
+                                Download
+                            </Button>
+                          </Card>
+                      ))}
+                  </div>
+              ) : (
+                  <Card className="p-8 text-center border-dashed border-[#444746]">
+                      <p className="text-[#8E918F] mb-4">No purchased digital products.</p>
+                      <Button variant="outline" onClick={() => navigate('/market')}>Go to Marketplace</Button>
+                  </Card>
               )}
             </div>
             

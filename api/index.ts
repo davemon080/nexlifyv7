@@ -84,6 +84,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Fetch enrollments
           const { rows: enrollRows } = await pool.query('SELECT course_id FROM enrollments WHERE user_id = $1', [user.id]);
           const enrolledCourses = enrollRows.map((e: any) => e.course_id);
+
+          // Fetch Purchases
+          const { rows: purchaseRows } = await pool.query('SELECT product_id FROM purchases WHERE user_id = $1', [user.id]);
+          const purchasedProducts = purchaseRows.map((e: any) => e.product_id);
           
           return res.status(200).json({
               id: user.id,
@@ -94,7 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               status: user.status,
               photoUrl: user.photo_url,
               joinedAt: user.created_at,
-              enrolledCourses
+              enrolledCourses,
+              purchasedProducts
           });
       } else {
           // Register new user automatically
@@ -113,7 +118,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               status: 'active',
               photoUrl: picture,
               joinedAt: new Date().toISOString(),
-              enrolledCourses: []
+              enrolledCourses: [],
+              purchasedProducts: []
           });
       }
     }
@@ -135,6 +141,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { rows: enrollRows } = await pool.query('SELECT course_id FROM enrollments WHERE user_id = $1', [user.id]);
       const enrolledCourses = enrollRows.map((e: any) => e.course_id);
 
+      // Fetch Purchases
+      const { rows: purchaseRows } = await pool.query('SELECT product_id FROM purchases WHERE user_id = $1', [user.id]);
+      const purchasedProducts = purchaseRows.map((e: any) => e.product_id);
+
       return res.status(200).json({
         id: user.id,
         name: user.name,
@@ -144,7 +154,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: user.status,
         photoUrl: user.photo_url,
         joinedAt: user.created_at,
-        enrolledCourses
+        enrolledCourses,
+        purchasedProducts
       });
     }
 
@@ -167,7 +178,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           [id, name, email, password, finalRole]
         );
         return res.status(200).json({
-          id, name, email, role: finalRole, balance: 0, status: 'active', enrolledCourses: []
+          id, name, email, role: finalRole, balance: 0, status: 'active', enrolledCourses: [], purchasedProducts: []
         });
       } catch (e: any) {
         if (e.code === '23505') return res.status(400).json({ error: 'Email already exists' });
@@ -193,11 +204,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'recordTransaction') {
       const { userId, type, itemId, amount, reference } = body;
       const id = `tx-${Date.now()}`;
+      
+      // 1. Record Transaction
       await pool.query(
         'INSERT INTO transactions (id, user_id, type, item_id, amount, reference) VALUES ($1, $2, $3, $4, $5, $6)',
         [id, userId, type, itemId, amount, reference]
       );
+
+      // 2. Grant Access based on type
+      if (type === 'product_purchase') {
+          await pool.query(
+              'INSERT INTO purchases (user_id, product_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [userId, itemId]
+          );
+      } else if (type === 'course_enrollment') {
+           await pool.query(
+            'INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [userId, itemId]
+          );
+      }
+
       return res.status(200).json({ success: true });
+    }
+    
+    // --- ADMIN STATS ---
+    if (action === 'getAdminStats') {
+        const revenueRes = await pool.query('SELECT SUM(amount) as total FROM transactions WHERE status = \'success\'');
+        const totalRevenue = revenueRes.rows[0].total || 0;
+        
+        return res.status(200).json({
+            totalRevenue: parseFloat(totalRevenue)
+        });
     }
 
     // --- PRODUCTS ---
