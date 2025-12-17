@@ -110,7 +110,7 @@ export const Card: React.FC<CardProps> = ({ children, className = '', hoverEffec
 };
 
 // Badge Component
-export const Badge: React.FC<{ children: React.ReactNode; color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple' }> = ({ children, color = 'blue' }) => {
+export const Badge: React.FC<{ children: React.ReactNode; color?: 'blue' | 'green' | 'yellow' | 'red' | 'purple'; className?: string }> = ({ children, color = 'blue', className = '' }) => {
   const colors = {
     blue: "bg-[#0842A0] text-[#D3E3FD] border border-[#A8C7FA]/30",
     green: "bg-[#0F5223] text-[#C4EED0] border border-[#6DD58C]/30",
@@ -119,7 +119,7 @@ export const Badge: React.FC<{ children: React.ReactNode; color?: 'blue' | 'gree
     purple: "bg-[#4A0072] text-[#EDBEF7] border border-[#D0BCFF]/30"
   };
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide ${colors[color]}`}>
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium tracking-wide ${colors[color]} ${className}`}>
       {children}
     </span>
   );
