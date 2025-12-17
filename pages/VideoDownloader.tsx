@@ -1,15 +1,25 @@
 import React, { useState } from 'react';
 import { Button, Card, Badge } from '../components/UI';
-import { Download, Link as LinkIcon, Youtube, Facebook, Instagram, Video, CheckCircle, Loader2, AlertCircle, FileVideo, RefreshCw, ExternalLink, HardDrive } from 'lucide-react';
+import { Download, Link as LinkIcon, Youtube, Facebook, Instagram, Video, CheckCircle, Loader2, AlertCircle, FileVideo, RefreshCw, ExternalLink } from 'lucide-react';
 
 export const VideoDownloader: React.FC = () => {
   const [url, setUrl] = useState('');
   const [processing, setProcessing] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [statusText, setStatusText] = useState(''); 
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
-  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Helper to detect platform
+  const getPlatform = (url: string) => {
+    if (url.includes('youtube') || url.includes('youtu.be')) return 'YouTube';
+    if (url.includes('facebook') || url.includes('fb.watch')) return 'Facebook';
+    if (url.includes('instagram')) return 'Instagram';
+    if (url.includes('twitter') || url.includes('x.com')) return 'Twitter/X';
+    if (url.includes('tiktok')) return 'TikTok';
+    return 'Web Video';
+  };
 
   const handleProcess = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,69 +30,93 @@ export const VideoDownloader: React.FC = () => {
     setResult(null);
     setError('');
     setDownloadProgress(0);
-    setStatusText('Resolving video stream...');
+    setStatusText('Connecting to server...');
 
     try {
-        // We use Cobalt as a resolver to get the direct stream URL
-        // This is a free, privacy-friendly tool that supports many platforms
-        const response = await fetch('https://api.cobalt.tools/api/json', {
-            method: 'POST',
+        // Construct API URL with query parameters
+        // We use format=mp4 to ensure we get video, not audio.
+        const encodedUrl = encodeURIComponent(url);
+        const apiUrl = `https://youtube-info-download-api.p.rapidapi.com/ajax/download.php?format=mp4&add_info=0&url=${encodedUrl}&allow_extended_duration=false&no_merge=false`;
+
+        const response = await fetch(apiUrl, {
+            method: 'GET',
             headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url: url,
-                vCodec: 'h264',
-                vQuality: '720',
-                aFormat: 'mp3',
-                filenamePattern: 'basic'
-            })
+                'x-rapidapi-host': 'youtube-info-download-api.p.rapidapi.com',
+                'x-rapidapi-key': 'd65a7a1b87mshafe5687993d6894p101c7ajsn6d7c8469650c'
+            }
         });
 
-        const data = await response.json();
-
-        if (data.status === 'error') {
-            throw new Error(data.text || 'Could not find video at this URL');
+        if (!response.ok) {
+             throw new Error(`API Error: ${response.statusText}`);
         }
 
-        // Simulating metadata extraction since Cobalt simplifies the response
-        const videoData = {
-            title: data.filename || 'Downloaded Video',
-            // Use a generic placeholder if no thumb available, or try to parse from URL if possible
-            thumbnail: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80', 
-            source: new URL(url).hostname.replace('www.', ''),
-            downloadUrl: data.url,
-            formats: [
-                { quality: '720p/High', type: 'mp4', url: data.url }
-            ]
-        };
+        const data = await response.json();
         
-        setStatusText('Stream located');
-        await new Promise(r => setTimeout(r, 500)); // UX delay
-        setResult(videoData);
+        if (data.status === 'error' || data.error) {
+            throw new Error(data.message || data.error || 'Could not process video');
+        }
+
+        // Heuristic to find the URL in the response
+        // Common RapidAPI patterns: data.url, data.link, data.result.url, data.download_url
+        let videoUrl = data.url || data.link || data.download_url;
+        
+        // Sometimes data itself is the url if text/plain (unlikely for json fetch)
+        if (!videoUrl && data.result && typeof data.result === 'string') videoUrl = data.result;
+        if (!videoUrl && data.result && data.result.url) videoUrl = data.result.url;
+
+        // Fallback checks
+        if (!videoUrl) {
+            if (data.formats && data.formats.length > 0) {
+                videoUrl = data.formats[0].url;
+            } else {
+                 throw new Error('No download URL found in API response. The video might be private or restricted.');
+            }
+        }
+
+        const platform = getPlatform(url);
+        
+        // Simulate "Processing" time for better UX if API is too fast
+        setStatusText('Analyzing video streams...');
+        await new Promise(r => setTimeout(r, 800));
+
+        setResult({
+            title: data.title || data.filename || `Downloaded ${platform} Video`,
+            thumbnail: data.thumb || data.thumbnail || `https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=${new URL(url).origin}&size=128`, // Generic favicon/thumb fallback
+            source: platform,
+            downloadUrl: videoUrl,
+            formats: [
+                { quality: 'Best Available', size: 'Unknown', type: 'mp4', url: videoUrl }
+            ]
+        });
 
     } catch (err: any) {
         console.error(err);
-        setError(err.message || 'Failed to process video.');
+        setError(err.message || 'Failed to fetch video. Please check the URL and try again.');
     } finally {
         setProcessing(false);
     }
   };
 
-  const downloadFileInBrowser = async (fileUrl: string, fileName: string) => {
+  const handleDownloadFile = async (fileUrl: string, fileName: string) => {
       setIsDownloading(true);
       setDownloadProgress(0);
-      setStatusText('Initializing download...');
+      setStatusText('Starting download...');
 
       try {
-          // fetch the remote file
+          // Attempt 1: Fetch Blob (Allows Progress Bar)
+          // This only works if the source server allows CORS (Access-Control-Allow-Origin: *)
           const response = await fetch(fileUrl);
           
-          if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
-          if (!response.body) throw new Error('ReadableStream not supported');
+          if (!response.ok) throw new Error('Network response was not ok');
+          if (!response.body) throw new Error('ReadableStream not yet supported in this browser.');
 
+          // to access headers, server must send Access-Control-Expose-Headers: content-length
           const contentLength = response.headers.get('content-length');
+          if (!contentLength) {
+             // Fallback if no content length: just download without specific progress
+             console.warn("No content-length header");
+          }
+
           const total = contentLength ? parseInt(contentLength, 10) : 0;
           let loaded = 0;
 
@@ -92,51 +126,42 @@ export const VideoDownloader: React.FC = () => {
           while (true) {
               const { done, value } = await reader.read();
               if (done) break;
-              
-              if (value) {
-                chunks.push(value);
-                loaded += value.length;
-                if (total > 0) {
-                    setDownloadProgress(Math.round((loaded / total) * 100));
-                } else {
-                    // Estimate progress if total size is unknown
-                    setDownloadProgress(prev => Math.min(prev + 1, 95));
-                }
+              chunks.push(value);
+              loaded += value.length;
+              if (total > 0) {
+                  setDownloadProgress(Math.round((loaded / total) * 100));
+              } else {
+                  // Fake progress if total unknown
+                  setDownloadProgress(prev => Math.min(prev + 5, 90));
               }
           }
 
-          setStatusText('Finalizing file...');
-          const blob = new Blob(chunks, { type: 'video/mp4' });
+          const blob = new Blob(chunks);
           const blobUrl = window.URL.createObjectURL(blob);
-          
-          // Trigger download
           const a = document.createElement('a');
           a.href = blobUrl;
-          a.download = fileName.endsWith('.mp4') ? fileName : `${fileName}.mp4`;
+          a.download = fileName; // Try to use the filename from API
           document.body.appendChild(a);
           a.click();
-          
-          // Cleanup
           window.URL.revokeObjectURL(blobUrl);
           document.body.removeChild(a);
-          
           setDownloadProgress(100);
           setStatusText('Download Complete!');
-          setTimeout(() => setIsDownloading(false), 2000);
 
       } catch (err) {
-          console.error("Browser download failed (likely CORS)", err);
-          setError("Direct browser download failed due to security (CORS). Opening fallback link.");
-          setIsDownloading(false);
-          // Fallback
+          console.warn("CORS blocked direct download, falling back to direct link.", err);
+          // Attempt 2: Direct Window Open (Fallback)
+          // This relies on the browser to handle the file
           window.open(fileUrl, '_blank');
+          setStatusText('Opened in new tab (CORS restricted)');
+      } finally {
+          setTimeout(() => setIsDownloading(false), 3000);
       }
   };
 
   const reset = () => {
       setResult(null);
       setUrl('');
-      setError('');
       setDownloadProgress(0);
       setIsDownloading(false);
   };
@@ -145,10 +170,10 @@ export const VideoDownloader: React.FC = () => {
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-            <Badge color="green"><div className="flex items-center gap-2"><HardDrive className="w-3 h-3" /> Browser Downloader</div></Badge>
+            <Badge color="green"><div className="flex items-center gap-2"><Download className="w-3 h-3" /> Free Tool</div></Badge>
             <h1 className="text-3xl md:text-5xl font-bold text-[#E3E3E3] mt-4 mb-4">Universal Video Downloader</h1>
             <p className="text-[#C4C7C5] max-w-2xl mx-auto">
-                Save videos directly to your device. Supports YouTube, TikTok, Twitter, and more.
+                Download videos from YouTube, Facebook, TikTok, Twitter and more.
             </p>
         </div>
 
@@ -170,7 +195,7 @@ export const VideoDownloader: React.FC = () => {
                             />
                         </div>
                         <Button size="lg" className="bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3] h-auto py-4 px-8" icon={Download}>
-                            Resolve
+                            Start
                         </Button>
                     </div>
                     <div className="flex justify-center gap-6 mt-6 text-[#8E918F] text-sm">
@@ -185,7 +210,7 @@ export const VideoDownloader: React.FC = () => {
                         <Loader2 className="w-10 h-10 text-[#6DD58C] animate-spin" />
                         <div>
                             <h3 className="text-xl font-bold text-[#E3E3E3]">{statusText}</h3>
-                            <p className="text-[#8E918F] text-sm mt-1">Analyzing media source...</p>
+                            <p className="text-[#8E918F] text-sm mt-1">Please wait...</p>
                         </div>
                     </div>
                  </div>
@@ -193,61 +218,86 @@ export const VideoDownloader: React.FC = () => {
                 <div className="animate-slideUp">
                     <div className="flex justify-between items-center mb-6 border-b border-[#444746] pb-4">
                         <h3 className="text-xl font-bold text-[#E3E3E3]">Download Ready</h3>
-                        <Button variant="outline" size="sm" onClick={reset} icon={RefreshCw}>New Search</Button>
+                        <Button variant="outline" size="sm" onClick={reset} icon={RefreshCw}>Download Another</Button>
                     </div>
                     
                     <div className="flex flex-col lg:flex-row gap-8">
-                        {/* Download Options */}
-                        <div className="w-full space-y-4">
-                            <div className="flex items-center justify-between p-4 rounded-xl border border-[#444746] bg-[#131314]">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 rounded-lg bg-[#6DD58C]/20 text-[#6DD58C]">
-                                        <Video className="w-6 h-6" />
-                                    </div>
-                                    <div className="overflow-hidden">
-                                        <div className="text-[#E3E3E3] font-bold truncate pr-4">{result.title}</div>
-                                        <div className="text-[#8E918F] text-xs uppercase">{result.source} • {result.formats[0].quality}</div>
-                                    </div>
+                        {/* Video Preview */}
+                        <div className="w-full lg:w-1/2">
+                            <div className="aspect-video bg-black rounded-xl overflow-hidden border border-[#444746] shadow-2xl relative">
+                                <video 
+                                    src={result.downloadUrl} 
+                                    controls 
+                                    className="w-full h-full object-contain"
+                                    poster={result.thumbnail}
+                                >
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                            <div className="mt-4">
+                                <h4 className="font-bold text-[#E3E3E3] line-clamp-2">{result.title}</h4>
+                                <div className="flex gap-3 mt-2 text-sm text-[#8E918F]">
+                                    <span className="bg-[#131314] px-2 py-1 rounded border border-[#444746]">{result.source}</span>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Download Options */}
+                        <div className="w-full lg:w-1/2 space-y-4">
+                            <p className="text-sm text-[#8E918F] font-medium uppercase tracking-wider mb-2">Download File</p>
                             
                             {isDownloading ? (
-                                <div className="p-6 bg-[#131314] rounded-xl border border-[#444746] text-center animate-fadeIn">
+                                <div className="p-6 bg-[#131314] rounded-xl border border-[#444746] text-center">
                                     <div className="mb-4 relative h-3 w-full bg-[#1E1F20] rounded-full overflow-hidden">
                                         <div 
                                             className="absolute top-0 left-0 h-full bg-[#6DD58C] transition-all duration-300"
                                             style={{ width: `${downloadProgress}%` }}
                                         ></div>
                                     </div>
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-[#E3E3E3] font-bold">{downloadProgress}%</span>
-                                        <span className="text-[#8E918F]">{statusText}</span>
-                                    </div>
+                                    <p className="text-[#E3E3E3] font-bold">{downloadProgress}%</p>
+                                    <p className="text-[#8E918F] text-sm">{statusText}</p>
                                 </div>
                             ) : (
-                                <div className="flex gap-4">
-                                    <Button 
-                                        className="flex-1 bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3] py-4"
-                                        icon={Download}
-                                        onClick={() => downloadFileInBrowser(result.downloadUrl, result.title)}
+                                result.formats.map((format: any, idx: number) => (
+                                    <div 
+                                        key={idx}
+                                        className="flex items-center justify-between p-4 rounded-xl border border-[#444746] bg-[#131314] hover:border-[#6DD58C] transition-all group"
                                     >
-                                        Download to Device
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="flex-1"
-                                        icon={ExternalLink}
-                                        onClick={() => window.open(result.downloadUrl, '_blank')}
-                                    >
-                                        Direct Link
-                                    </Button>
-                                </div>
+                                        <div className="flex items-center gap-4">
+                                            <div className="p-3 rounded-lg bg-[#6DD58C]/20 text-[#6DD58C]">
+                                                <Video className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <div className="text-[#E3E3E3] font-bold">{format.quality}</div>
+                                                <div className="text-[#8E918F] text-xs uppercase">{format.type}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                className="bg-[#6DD58C] text-[#0F5223] hover:bg-[#85E0A3]"
+                                                icon={Download}
+                                                onClick={() => handleDownloadFile(format.url, result.title + '.mp4')}
+                                            >
+                                                Download
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => window.open(format.url, '_blank')}
+                                                icon={ExternalLink}
+                                            >
+                                                Open
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))
                             )}
 
-                            <div className="mt-4 p-4 bg-[#A8C7FA]/10 rounded-xl border border-[#A8C7FA]/20 text-sm text-[#A8C7FA] flex gap-3 items-start">
+                            <div className="mt-6 p-4 bg-[#A8C7FA]/10 rounded-xl border border-[#A8C7FA]/20 text-sm text-[#A8C7FA] flex gap-3 items-start">
                                 <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
                                 <p>
-                                    Video is downloaded directly in your browser. If the progress bar doesn't move, use the "Direct Link" button.
+                                    If the download doesn't start automatically, click "Open" to view the raw file, then right-click and select "Save Video As".
                                 </p>
                             </div>
                         </div>
@@ -264,7 +314,7 @@ export const VideoDownloader: React.FC = () => {
         )}
 
         <div className="mt-8 text-center text-xs text-[#5E5E5E]">
-            This tool processes data in-browser where possible. Please respect copyright laws.
+            Powered by RapidAPI. This tool is for educational purposes only. Please respect copyright laws.
         </div>
       </div>
     </div>
