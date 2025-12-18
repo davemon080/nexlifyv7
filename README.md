@@ -26,14 +26,14 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
-  role TEXT DEFAULT 'user', -- 'admin', 'tutor', 'user'
-  balance DECIMAL(10, 2) DEFAULT 0,
+  role TEXT DEFAULT 'user',
+  balance DECIMAL(15, 2) DEFAULT 0,
   status TEXT DEFAULT 'active',
   photo_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Courses Table (Using JSONB for modules)
+-- Courses Table
 CREATE TABLE IF NOT EXISTS courses (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
@@ -42,10 +42,21 @@ CREATE TABLE IF NOT EXISTS courses (
   level TEXT,
   duration TEXT,
   instructor TEXT,
-  tutor_id TEXT REFERENCES users(id), -- Linked Instructor
-  price DECIMAL(10, 2) DEFAULT 0,
+  tutor_id TEXT REFERENCES users(id),
+  price DECIMAL(15, 2) DEFAULT 0,
   modules_json JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Course Materials Table (NEW: Stores PDF/DOC files)
+CREATE TABLE IF NOT EXISTS course_materials (
+    id TEXT PRIMARY KEY,
+    course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id TEXT,
+    file_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    file_data TEXT NOT NULL, -- Base64 Data
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tutor Questions Table
@@ -61,14 +72,6 @@ CREATE TABLE IF NOT EXISTS tutor_questions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Purchases Table
-CREATE TABLE IF NOT EXISTS purchases (
-  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-  product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
-  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id, product_id)
-);
-
 -- Enrollments Table
 CREATE TABLE IF NOT EXISTS enrollments (
   user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
@@ -76,25 +79,16 @@ CREATE TABLE IF NOT EXISTS enrollments (
   enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, course_id)
 );
-```
 
-### Required Updates for Existing Databases
-If you have already created your database, run these commands:
-
-```sql
--- Support Tutor assignment
-ALTER TABLE courses ADD COLUMN IF NOT EXISTS tutor_id TEXT REFERENCES users(id);
-
--- Create Questions Table
-CREATE TABLE IF NOT EXISTS tutor_questions (
-    id TEXT PRIMARY KEY,
-    course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
-    lesson_id TEXT,
-    student_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-    student_name TEXT,
-    question TEXT NOT NULL,
-    reply TEXT,
-    replied_at TIMESTAMP,
+-- Transactions Table
+CREATE TABLE IF NOT EXISTS transactions (
+    id SERIAL PRIMARY KEY,
+    user_id TEXT REFERENCES users(id),
+    type TEXT,
+    target_id TEXT,
+    amount DECIMAL(15, 2),
+    reference TEXT,
+    status TEXT DEFAULT 'success',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
