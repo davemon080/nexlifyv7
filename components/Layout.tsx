@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Menu, X, ShoppingBag, Briefcase, DollarSign, LayoutDashboard, Home, Sparkles, GraduationCap, User as UserIcon, Cloud, CloudOff, Bot, Bell, Clock, Info, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Menu, X, ShoppingBag, Briefcase, DollarSign, LayoutDashboard, Home, Sparkles, GraduationCap, User as UserIcon, Cloud, CloudOff, Bot, Bell, Clock, Info, CheckCircle, AlertTriangle, AlertCircle, ChevronLeft } from 'lucide-react';
 import { Button, Badge as UIBadge } from './UI';
 import { isCloudEnabled, getAppSettings, getNotifications, markNotificationRead } from '../services/mockData';
 import { AppSettings, Notification } from '../types';
@@ -12,7 +12,6 @@ export const Navbar: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(getAppSettings());
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
-  const mobileNotifRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,26 +36,39 @@ export const Navbar: React.FC = () => {
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setIsNotifOpen(false);
-      }
-      if (mobileNotifRef.current && !mobileNotifRef.current.contains(event.target as Node)) {
-        setIsNotifOpen(false);
+      // If notification drawer is open, and click is outside the drawer AND outside any toggle button
+      if (isNotifOpen && notifRef.current && !notifRef.current.contains(event.target as Node)) {
+          // Special check: don't close if clicking the toggle button (it has its own onClick)
+          const isToggleButton = (event.target as HTMLElement).closest('.notif-toggle-btn');
+          if (!isToggleButton) {
+            setIsNotifOpen(false);
+          }
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isNotifOpen]);
 
   const loadNotifications = async () => {
       if (!currentUser) return;
-      const data = await getNotifications(currentUser.id);
-      setNotifications(data);
+      try {
+        const data = await getNotifications(currentUser.id);
+        setNotifications(data);
+      } catch (e) {
+        console.error("Failed to load notifications");
+      }
   };
 
   const handleMarkRead = async (id: string) => {
       await markNotificationRead(id);
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+  };
+
+  const handleClearAll = async () => {
+      const unread = notifications.filter(n => !n.isRead);
+      for(const n of unread) {
+          await handleMarkRead(n.id);
+      }
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -97,27 +109,37 @@ export const Navbar: React.FC = () => {
   };
 
   const NotificationDrawer = ({ isMobile = false }: { isMobile?: boolean }) => (
-    <div className={`${isMobile ? 'fixed inset-x-0 top-20 bottom-0 z-[100] h-[calc(100vh-80px)]' : 'absolute right-0 mt-4 w-80 md:w-96'} bg-[#1E1F20] border border-[#444746] ${!isMobile && 'rounded-2xl shadow-2xl'} overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200`}>
-        <div className="p-4 bg-[#131314] border-b border-[#444746] flex justify-between items-center">
-            <div className="flex items-center gap-2">
-                <Bell className="w-4 h-4 text-[#A8C7FA]" />
-                <h3 className="font-bold text-[#E3E3E3]">Activity Hub</h3>
+    <div 
+      ref={notifRef}
+      className={`${isMobile ? 'fixed inset-x-0 top-0 bottom-0 z-[100] h-screen' : 'absolute right-0 mt-4 w-80 md:w-96'} bg-[#1E1F20] border border-[#444746] ${!isMobile && 'rounded-2xl shadow-2xl'} overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200`}
+    >
+        <div className="p-4 bg-[#131314] border-b border-[#444746] flex justify-between items-center h-20">
+            <div className="flex items-center gap-3">
+                {isMobile && (
+                    <button onClick={() => setIsNotifOpen(false)} className="p-2 -ml-2 text-[#C4C7C5]">
+                        <ChevronLeft className="w-6 h-6" />
+                    </button>
+                )}
+                <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-[#A8C7FA]" />
+                    <h3 className="font-bold text-[#E3E3E3]">Activity Hub</h3>
+                </div>
             </div>
             <UIBadge color="blue">{unreadCount} New</UIBadge>
         </div>
-        <div className={`${isMobile ? 'h-[calc(100%-110px)]' : 'max-h-[400px]'} overflow-y-auto custom-scrollbar`}>
+        <div className={`${isMobile ? 'h-[calc(100%-140px)]' : 'max-h-[400px]'} overflow-y-auto custom-scrollbar`}>
             {notifications.length === 0 ? (
                 <div className="p-10 text-center text-[#8E918F]">
                     <div className="w-16 h-16 bg-[#131314] rounded-full flex items-center justify-center mx-auto mb-4 border border-[#444746]">
                         <Bell className="w-6 h-6 opacity-20" />
                     </div>
-                    <p className="text-sm font-medium">All caught up!</p>
+                    <p className="text-sm font-medium text-[#E3E3E3]">All caught up!</p>
                     <p className="text-xs mt-1">No new notifications at this time.</p>
                 </div>
             ) : (
                 notifications.map(notif => (
-                    <div key={notif.id} onClick={() => handleMarkRead(notif.id)} className={`p-4 border-b border-[#444746] hover:bg-[#2D2E30] transition-colors cursor-pointer relative ${!notif.isRead ? 'bg-[#A8C7FA]/5' : ''}`}>
-                        {!notif.isRead && <div className="absolute top-4 right-4 w-2 h-2 bg-[#A8C7FA] rounded-full shadow-[0_0_8px_rgba(168,199,250,0.6)]" />}
+                    <div key={notif.id} onClick={() => handleMarkRead(notif.id)} className={`p-5 border-b border-[#444746] hover:bg-[#2D2E30] transition-colors cursor-pointer relative ${!notif.isRead ? 'bg-[#A8C7FA]/5' : ''}`}>
+                        {!notif.isRead && <div className="absolute top-6 right-6 w-2 h-2 bg-[#A8C7FA] rounded-full shadow-[0_0_8px_rgba(168,199,250,0.6)]" />}
                         <div className="flex gap-4">
                             <div className="mt-1 flex-shrink-0">{getNotifIcon(notif.type)}</div>
                             <div className="flex-1 min-w-0">
@@ -133,12 +155,10 @@ export const Navbar: React.FC = () => {
                 ))
             )}
         </div>
-        <div className="p-3 bg-[#131314] text-center border-t border-[#444746]">
+        <div className="p-4 bg-[#131314] text-center border-t border-[#444746] absolute bottom-0 w-full">
             <button 
-                onClick={async () => {
-                    for(const n of notifications) if(!n.isRead) await handleMarkRead(n.id);
-                }}
-                className="text-[10px] uppercase tracking-widest text-[#A8C7FA] hover:text-white transition-colors font-black"
+                onClick={handleClearAll}
+                className="text-[10px] uppercase tracking-widest text-[#A8C7FA] hover:text-white transition-colors font-black py-2 px-4"
             >
                 Clear all unread
             </button>
@@ -173,8 +193,11 @@ export const Navbar: React.FC = () => {
             
             <div className="ml-4 pl-4 border-l border-[#444746] flex items-center gap-4">
               {currentUser && (
-                  <div className="relative" ref={notifRef}>
-                      <button onClick={() => setIsNotifOpen(!isNotifOpen)} className={`p-2 rounded-full transition-all relative ${isNotifOpen ? 'bg-[#A8C7FA]/10 text-[#A8C7FA]' : 'text-[#C4C7C5] hover:text-[#E3E3E3] hover:bg-[#1E1F20]'}`}>
+                  <div className="relative">
+                      <button 
+                        onClick={() => setIsNotifOpen(!isNotifOpen)} 
+                        className={`notif-toggle-btn p-2 rounded-full transition-all relative ${isNotifOpen ? 'bg-[#A8C7FA]/10 text-[#A8C7FA]' : 'text-[#C4C7C5] hover:text-[#E3E3E3] hover:bg-[#1E1F20]'}`}
+                      >
                           <Bell className="w-5 h-5" />
                           {unreadCount > 0 && (
                               <span className="absolute top-1 right-1 w-4 h-4 bg-[#CF6679] text-[#370007] text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-[#131314]">
@@ -204,7 +227,7 @@ export const Navbar: React.FC = () => {
                     setIsNotifOpen(!isNotifOpen);
                     if(isOpen) setIsOpen(false);
                 }} 
-                className={`p-2 rounded-full transition-all relative ${isNotifOpen ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5]'}`}
+                className={`notif-toggle-btn p-2 rounded-full transition-all relative ${isNotifOpen ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5]'}`}
                >
                   <Bell className="w-6 h-6" />
                   {unreadCount > 0 && (
@@ -224,9 +247,9 @@ export const Navbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Mobile Notification View - Now using higher z-index to stay on top */}
+      {/* Mobile Notification Hub */}
       {isNotifOpen && (
-          <div className="lg:hidden" ref={mobileNotifRef}>
+          <div className="lg:hidden">
               <NotificationDrawer isMobile />
           </div>
       )}
