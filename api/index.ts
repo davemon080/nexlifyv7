@@ -174,7 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               [newId, name, email, 'google-oauth-user', 'user', 0, 'active', picture]
           );
           return res.status(200).json({
-              id: newId, name, email, role: 'user', balance: 0, status: 'active', photoUrl: picture,
+              id: newId, name: email.split('@')[0], email, role: 'user', balance: 0, status: 'active', photoUrl: picture,
               joinedAt: new Date().toISOString(), enrolledCourses: [], purchasedProducts: []
           });
       }
@@ -411,7 +411,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'getInquiries') {
         const { rows } = await pool.query('SELECT * FROM inquiries ORDER BY created_at DESC');
         const mapped = rows.map((i: any) => ({
-            id: i.id, name: i.name, email: i.email, message: i.message, serviceType: i.service_type, status: i.status, createdAt: i.created_at
+            id: i.id, 
+            name: i.name, 
+            email: i.email, 
+            message: i.message, 
+            serviceType: i.service_type, 
+            status: i.status, 
+            createdAt: i.created_at
         }));
         return res.status(200).json(mapped);
     }

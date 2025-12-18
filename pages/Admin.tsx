@@ -17,7 +17,7 @@ import {
   Wallet, Search, MoreVertical, X, Check, 
   Upload, FileText, Download, Edit, Video, 
   GripVertical, Settings, Save, Globe, Eye, BookOpen, Bell, Send, HelpCircle, ChevronDown, ChevronUp, Link as LinkIcon, DownloadCloud,
-  Sparkles, Image as ImageIcon, DollarSign, Tag, Info
+  Sparkles, Image as ImageIcon, DollarSign, Tag, Info, MessageSquare, Mail, Calendar, ExternalLink
 } from 'lucide-react';
 
 export const Admin: React.FC = () => {
@@ -245,6 +245,55 @@ export const Admin: React.FC = () => {
                 ))}
             </div>
         </div>
+      )}
+
+      {/* --- INQUIRIES TAB --- */}
+      {activeTab === 'inquiries' && (
+          <div className="space-y-6">
+              <div className="bg-[#1E1F20] p-6 rounded-3xl border border-[#444746] flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#E3E3E3]">Hire Inquiries</h3>
+                    <p className="text-sm text-[#8E918F]">New project requests from the hire page.</p>
+                  </div>
+                  <Badge color="blue">{inquiries.length} Total</Badge>
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {inquiries.map(inq => (
+                      <Card key={inq.id} className="p-6 border-[#444746] relative overflow-hidden group">
+                          <div className="flex items-start justify-between mb-6">
+                              <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 rounded-2xl bg-[#A8C7FA]/10 flex items-center justify-center text-[#A8C7FA]">
+                                      <MessageSquare className="w-6 h-6" />
+                                  </div>
+                                  <div>
+                                      <h4 className="font-bold text-[#E3E3E3]">{inq.name}</h4>
+                                      <div className="flex items-center gap-2 text-xs text-[#8E918F]">
+                                          <Mail className="w-3 h-3" /> {inq.email}
+                                      </div>
+                                  </div>
+                              </div>
+                              <button onClick={() => deleteInquiry(inq.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-xl">
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                          <div className="bg-[#131314] rounded-2xl p-4 mb-6">
+                              <Badge color="purple" className="mb-3 uppercase font-bold text-[10px]">{inq.serviceType}</Badge>
+                              <p className="text-sm text-[#C4C7C5] leading-relaxed italic">"{inq.message}"</p>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-[#5E5E5E] uppercase tracking-widest">
+                              <div className="flex items-center gap-2"><Calendar className="w-3.5 h-3.5" /> {new Date(inq.createdAt).toLocaleDateString()}</div>
+                              <a href={`mailto:${inq.email}?subject=Regarding your Nexlify Inquiry`} className="text-[#A8C7FA] hover:underline flex items-center gap-1">Reply via Email <ExternalLink className="w-3 h-3" /></a>
+                          </div>
+                      </Card>
+                  ))}
+                  {inquiries.length === 0 && (
+                      <div className="lg:col-span-2 py-20 text-center text-[#8E918F]">
+                          <Mail className="w-12 h-12 mx-auto mb-4 opacity-10" />
+                          <p>No new project inquiries at this moment.</p>
+                      </div>
+                  )}
+              </div>
+          </div>
       )}
 
       {/* --- USERS TAB --- */}

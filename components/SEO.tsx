@@ -37,15 +37,15 @@ export const SEO: React.FC<SEOProps> = ({
   const defaults: PageSeoConfig | undefined = settings?.defaultSeo;
 
   const siteName = settings?.platformName || 'Nexlify';
+  const siteLogo = settings?.logoUrl || '';
   
   const title = dbConfig?.title || propTitle || defaults?.title || 'Nexlify - Digital Platform';
   const description = dbConfig?.description || propDescription || defaults?.description || 'A complete digital ecosystem for skills, services, and assets.';
   const keywords = dbConfig?.keywords || propKeywords || defaults?.keywords || 'digital, skills, marketplace, earning, ai';
-  const image = dbConfig?.ogImage || propImage || defaults?.ogImage || settings?.logoUrl || '';
+  const image = propImage || dbConfig?.ogImage || defaults?.ogImage || siteLogo;
 
   const fullTitle = title.includes(siteName) ? title : `${title} | ${siteName}`;
 
-  // React 19 Native Metadata: Just render tags, React hoists them to <head> automatically.
   return (
     <>
       {/* Standard Metadata */}
