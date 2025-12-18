@@ -8,7 +8,7 @@ export enum ProductCategory {
 }
 
 export interface PageSeoConfig {
-  path: string; // The route path (e.g., '/', '/market', '/hire')
+  path: string; 
   title: string;
   description: string;
   keywords: string;
@@ -18,7 +18,6 @@ export interface PageSeoConfig {
 export interface AppSettings {
   logoUrl?: string;
   platformName: string;
-  // Map path -> SEO Config
   seoDefinitions?: Record<string, PageSeoConfig>; 
   defaultSeo?: PageSeoConfig;
 }
@@ -30,8 +29,8 @@ export interface Product {
   category: ProductCategory;
   price: number;
   imageUrl: string;
-  previewUrl?: string; // URL for live preview
-  downloadUrl?: string; // Simulated file path
+  previewUrl?: string; 
+  downloadUrl?: string; 
   createdAt: string;
 }
 
@@ -45,16 +44,26 @@ export interface Inquiry {
   status: 'new' | 'read' | 'archived';
 }
 
+export interface Notification {
+    id: string;
+    userId: string;
+    title: string;
+    message: string;
+    type: 'info' | 'success' | 'warning' | 'danger';
+    isRead: boolean;
+    createdAt: string;
+}
+
 export interface User {
   id: string;
   email: string;
-  password?: string; // In a real app, never store plain text
+  password?: string; 
   role: 'admin' | 'user';
   name: string;
   balance: number;
   joinedAt: string;
-  enrolledCourses?: string[]; // IDs of courses
-  purchasedProducts?: string[]; // IDs of products
+  enrolledCourses?: string[]; 
+  purchasedProducts?: string[]; 
   status?: 'active' | 'suspended' | 'banned';
   photoUrl?: string;
 }
@@ -82,29 +91,27 @@ export interface EarningMethod {
   potential: string;
 }
 
-// Training System Types
-
 export interface QuizQuestion {
     id: string;
     question: string;
-    options: string[]; // Array of 4 options
-    correctAnswer: number; // Index (0-3)
+    options: string[]; 
+    correctAnswer: number; 
 }
 
 export interface Lesson {
   id: string;
   title: string;
   type: 'video' | 'text' | 'quiz';
-  content: string; // URL for video, Text content for reading
-  fileUrl?: string; // PDF/Doc URL for reading
-  questions?: QuizQuestion[]; // For Quizzes
-  duration: string; // e.g. "15 mins"
+  content: string; 
+  fileUrl?: string; 
+  questions?: QuizQuestion[]; 
+  duration: string; 
   isCompleted?: boolean;
 }
 
 export interface Module {
   id: string;
-  title: string; // e.g. "Week 1: Introduction"
+  title: string; 
   description: string;
   lessons: Lesson[];
   isLocked?: boolean;
@@ -116,7 +123,7 @@ export interface Course {
   description: string;
   thumbnail: string;
   level: 'Beginner' | 'Intermediate' | 'Advanced';
-  duration: string; // "3 Months"
+  duration: string; 
   instructor: string;
   price: number;
   modules: Module[];

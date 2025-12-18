@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getProducts, logUserActivity, getCurrentUser, recordTransaction } from '../services/mockData';
+import { getProducts, logUserActivity, getCurrentUser, recordTransaction, sendNotification } from '../services/mockData';
 import { Product, ProductCategory, User } from '../types';
 import { Button, Card, Badge } from '../components/UI';
 import { Search, Filter, Download, ShoppingCart, Loader2, Eye, X, Share2, Copy, Check } from 'lucide-react';
@@ -35,26 +35,24 @@ export const Marketplace: React.FC = () => {
 
   const filterProducts = () => {
     let result = products;
-
-    if (selectedCategory !== 'All') {
-      result = result.filter(p => p.category === selectedCategory);
-    }
-
-    if (searchTerm) {
-      result = result.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
-    }
-
+    if (selectedCategory !== 'All') result = result.filter(p => p.category === selectedCategory);
+    if (searchTerm) result = result.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()));
     setFilteredProducts(result);
   };
 
-  const isPurchased = (productId: string) => {
-      if(!user) return false;
-      return user.purchasedProducts?.includes(productId);
-  };
+  const isPurchased = (productId: string) => user?.purchasedProducts?.includes(productId);
 
-  const handleDownload = (product: Product) => {
+  const handleDownload = async (product: Product) => {
     const currentUser = getCurrentUser();
-    if(currentUser) logUserActivity(currentUser.id, 'Download', `Downloaded product: ${product.title}`, 'info');
+    if(currentUser) {
+        logUserActivity(currentUser.id, 'Download', `Downloaded product: ${product.title}`, 'info');
+        await sendNotification({
+            userId: currentUser.id,
+            title: 'File Downloaded',
+            message: `You have successfully downloaded "${product.title}". Check your downloads folder.`,
+            type: 'info'
+        });
+    }
 
     if (product.downloadUrl) {
       const link = document.createElement('a');
@@ -69,320 +67,119 @@ export const Marketplace: React.FC = () => {
   };
 
   const handlePurchase = (product: Product, e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
+    if (e) { e.preventDefault(); e.stopPropagation(); }
     const currentUser = getCurrentUser();
-    if (!currentUser) {
-        alert("You must be logged in to purchase products.");
-        navigate('/login');
-        return;
-    }
-
-    if (!currentUser.email) {
-        alert("User email is missing. Please update your profile.");
-        return;
-    }
-
+    if (!currentUser) { navigate('/login'); return; }
+    
     const price = Number(product.price);
-    if (isNaN(price)) {
-        alert("Invalid product price data.");
-        return;
-    }
-
     if (price > 0) {
-         // Check if Paystack script is loaded
          const PaystackPop = (window as any).PaystackPop;
-         
-         if (!PaystackPop) {
-             alert("Paystack payment system is not loaded yet. Please check your internet connection and refresh the page.");
-             return;
-         }
-
+         if (!PaystackPop) { alert("Paystack not loaded."); return; }
          const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; 
-
          try {
-             console.log("Initializing Paystack for:", currentUser.email, price);
-             
              const handler = PaystackPop.setup({
                  key: paystackKey,
                  email: currentUser.email,
-                 amount: Math.ceil(price * 100), // Amount in kobo
+                 amount: Math.ceil(price * 100),
                  currency: 'NGN',
-                 ref: `nex-prod-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, // Unique reference
-                 // FIX: Removed 'async' keyword here. Paystack requires a standard function.
+                 ref: `nex-prod-${Date.now()}`,
                  callback: function(response: any) {
-                     // We wrap the async logic in an internal function and call it immediately.
                      const processSuccess = async () => {
-                         console.log("Payment success:", response);
                          try {
                             await recordTransaction(currentUser.id, 'product_purchase', product.id, price, response.reference);
-                            await logUserActivity(currentUser.id, 'Purchase', `Purchased product: ${product.title} for ₦${price}`, 'success');
-                            
-                            // Refresh user state
-                            const updatedUser = getCurrentUser();
-                            setUser(updatedUser);
-
-                            alert("Payment successful! Downloading your file...");
+                            setUser(getCurrentUser());
                             handleDownload(product);
-                            
-                            if (previewProduct && previewProduct.id === product.id) {
-                                setPreviewProduct(null);
-                            }
-                         } catch (err) {
-                             console.error("Post-payment processing error:", err);
-                             alert("Payment verified, but there was an error updating your account. Please contact support.");
-                         }
+                            setPreviewProduct(null);
+                         } catch (err) { console.error(err); }
                      };
-                     
                      processSuccess();
                  },
-                 onClose: function() {
-                     alert('Transaction was cancelled.');
-                 },
+                 onClose: () => alert('Transaction cancelled.'),
              });
-             
-             if (!handler) {
-                 throw new Error("Paystack handler could not be initialized.");
-             }
-
              handler.openIframe();
-
-         } catch (err: any) {
-             console.error("Paystack Error:", err);
-             alert(`Payment Error: ${err.message || 'Could not start payment flow'}`);
-         }
+         } catch (err: any) { alert("Payment Error"); }
     } else {
          handleDownload(product);
-         if (previewProduct && previewProduct.id === product.id) {
-             setPreviewProduct(null);
-         }
+         setPreviewProduct(null);
     }
   };
 
   const handleShare = async (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}${window.location.pathname}#/market?product=${product.id}`;
-    
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: product.title,
-                text: `Check out ${product.title} on Nexlify!`,
-                url: url,
-            });
-        } catch (error) {
-            console.log('Error sharing:', error);
-        }
-    } else {
-        handleCopyLink(url);
-    }
-  };
-
-  const handleCopyLink = (url: string) => {
-      navigator.clipboard.writeText(url).then(() => {
-          alert("Product link copied to clipboard!");
-      });
+    const url = `${window.location.origin}/#/market?product=${product.id}`;
+    if (navigator.share) { try { await navigator.share({ title: product.title, url }); } catch (error) {} } 
+    else { navigator.clipboard.writeText(url); alert("Link copied!"); }
   };
 
   const categories = ['All', ...Object.values(ProductCategory)];
 
   return (
     <div className="min-h-screen pb-12">
-      <SEO 
-        title="Digital Marketplace - Buy Templates & Ebooks" 
-        description="Discover premium digital resources, ebooks, website templates, and design assets to accelerate your growth."
-        keywords="ebooks, website templates, digital downloads, nexlify marketplace, buy themes"
-      />
-      <div className="border-b border-[#444746] bg-[#1E1F20]/50 py-12 md:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SEO title="Digital Marketplace" description="Templates and Ebooks" />
+      <div className="border-b border-[#444746] bg-[#1E1F20]/50 py-12">
+        <div className="max-w-7xl mx-auto px-4">
           <Badge color="purple">Digital Store</Badge>
-          <h1 className="text-3xl md:text-4xl font-bold text-[#E3E3E3] mt-4 mb-4">Marketplace</h1>
-          <p className="text-[#C4C7C5] max-w-2xl text-lg">
-            Discover premium resources to accelerate your growth. From ebooks to website templates, find everything you need in one place.
-          </p>
+          <h1 className="text-3xl font-bold text-[#E3E3E3] mt-4">Marketplace</h1>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 -mt-8 relative z-10">
         <Card className="p-4 mb-12 bg-[#1E1F20] shadow-xl">
           <div className="flex flex-col lg:flex-row gap-6 justify-between items-center">
             <div className="relative w-full lg:w-96">
               <Search className="absolute left-4 top-3.5 h-5 w-5 text-[#8E918F]" />
-              <input
-                type="text"
-                placeholder="Search templates, ebooks..."
-                className="w-full pl-12 pr-4 py-3 bg-[#131314] border border-[#444746] rounded-full text-[#E3E3E3] focus:ring-2 focus:ring-[#A8C7FA] focus:border-transparent outline-none transition-all"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+              <input type="text" placeholder="Search..." className="w-full pl-12 pr-4 py-3 bg-[#131314] border border-[#444746] rounded-full text-[#E3E3E3] outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
-            
-            <div className="flex gap-2 overflow-x-auto w-full lg:w-auto pb-2 lg:pb-0 no-scrollbar touch-pan-x">
+            <div className="flex gap-2 overflow-x-auto w-full lg:w-auto no-scrollbar">
               {categories.map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  className={`px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
-                    selectedCategory === cat
-                      ? 'bg-[#A8C7FA] text-[#062E6F]'
-                      : 'bg-[#131314] text-[#C4C7C5] border border-[#444746] hover:border-[#8E918F]'
-                  }`}
-                >
-                  {cat}
-                </button>
+                <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-[#A8C7FA] text-[#062E6F]' : 'bg-[#131314] text-[#C4C7C5] border border-[#444746]'}`}>{cat}</button>
               ))}
             </div>
           </div>
         </Card>
 
         {loading ? (
-          <div className="flex justify-center py-32">
-            <Loader2 className="w-10 h-10 text-[#A8C7FA] animate-spin" />
-          </div>
+          <div className="flex justify-center py-32"><Loader2 className="w-10 h-10 text-[#A8C7FA] animate-spin" /></div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredProducts.map((product) => {
               const owned = isPurchased(product.id);
               return (
-              <Card key={product.id} className="flex flex-col h-full hoverEffect group">
-                <div className="relative aspect-[4/3] overflow-hidden bg-[#131314] border-b border-[#444746] cursor-pointer" onClick={() => setPreviewProduct(product)}>
-                  <img 
-                    src={product.imageUrl} 
-                    alt={product.title} 
-                    loading="lazy"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100" 
-                  />
+              <Card key={product.id} className="flex flex-col h-full group">
+                <div className="relative aspect-[4/3] bg-[#131314] cursor-pointer" onClick={() => setPreviewProduct(product)}>
+                  <img src={product.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <Button variant="secondary" size="sm" icon={Eye} onClick={(e) => { e.stopPropagation(); setPreviewProduct(product); }}>
-                          Preview
-                      </Button>
-                      <button 
-                        className="bg-[#1E1F20] text-[#E3E3E3] p-1.5 rounded-full hover:bg-[#A8C7FA] hover:text-[#062E6F] transition-colors"
-                        onClick={(e) => handleShare(product, e)}
-                        title="Share Product"
-                      >
-                          <Share2 className="w-4 h-4" />
-                      </button>
+                      <Button variant="secondary" size="sm" icon={Eye} onClick={() => setPreviewProduct(product)}>Preview</Button>
+                      <button className="bg-[#1E1F20] text-[#E3E3E3] p-1.5 rounded-full" onClick={(e) => handleShare(product, e)}><Share2 className="w-4 h-4" /></button>
                   </div>
                   <div className="absolute top-3 right-3">
-                    {owned ? (
-                        <Badge color="green"><div className="flex items-center gap-1"><Check className="w-3 h-3"/> Owned</div></Badge>
-                    ) : (
-                        <Badge color={product.price === 0 ? 'green' : 'blue'}>
-                          {product.price === 0 ? 'FREE' : `₦${Number(product.price).toLocaleString()}`}
-                        </Badge>
-                    )}
+                    {owned ? <Badge color="green">Owned</Badge> : <Badge color="blue">{product.price === 0 ? 'FREE' : `₦${Number(product.price).toLocaleString()}`}</Badge>}
                   </div>
                 </div>
                 <div className="p-6 flex-1 flex flex-col">
-                  <div className="text-xs text-[#A8C7FA] font-semibold mb-2 uppercase tracking-wide">
-                    {product.category}
-                  </div>
-                  <h3 className="text-lg font-bold text-[#E3E3E3] mb-3 line-clamp-1" title={product.title}>
-                    {product.title}
-                  </h3>
-                  <p className="text-[#8E918F] text-sm mb-6 line-clamp-2 flex-grow leading-relaxed">
-                    {product.description}
-                  </p>
-                  <div className="flex gap-2 mt-auto">
-                    {owned ? (
-                        <Button 
-                            className="flex-1 bg-[#0F5223] text-[#C4EED0] hover:bg-[#136C2E]" 
-                            icon={Download}
-                            onClick={() => handleDownload(product)}
-                        >
-                            Download
-                        </Button>
-                    ) : (
-                        <Button 
-                            className="flex-1" 
-                            variant={Number(product.price) === 0 ? 'secondary' : 'primary'}
-                            icon={Number(product.price) === 0 ? Download : ShoppingCart}
-                            onClick={(e) => handlePurchase(product, e)}
-                        >
-                            {Number(product.price) === 0 ? 'Get' : 'Buy'}
-                        </Button>
-                    )}
-                  </div>
+                  <div className="text-xs text-[#A8C7FA] font-semibold mb-2 uppercase">{product.category}</div>
+                  <h3 className="text-lg font-bold text-[#E3E3E3] mb-3 line-clamp-1">{product.title}</h3>
+                  <p className="text-[#8E918F] text-sm mb-6 line-clamp-2">{product.description}</p>
+                  <Button className="mt-auto" icon={owned || Number(product.price) === 0 ? Download : ShoppingCart} onClick={() => owned || Number(product.price) === 0 ? handleDownload(product) : handlePurchase(product)}>{owned ? 'Download' : Number(product.price) === 0 ? 'Get Free' : 'Buy Now'}</Button>
                 </div>
               </Card>
             )})}
           </div>
         )}
-        
-        {!loading && filteredProducts.length === 0 && (
-          <div className="text-center py-20 text-[#8E918F]">
-            <Filter className="w-16 h-16 mx-auto mb-6 opacity-20" />
-            <p className="text-xl font-medium mb-2">No products found</p>
-            <p className="mb-8">Try adjusting your filters or search terms</p>
-            <Button variant="outline" onClick={() => {setSearchTerm(''); setSelectedCategory('All');}}>
-              Clear Filters
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* Preview Modal */}
       {previewProduct && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
-              <div className="w-full max-w-6xl h-[90vh] bg-[#1E1F20] rounded-2xl flex flex-col border border-[#444746] shadow-2xl overflow-hidden relative">
+              <div className="w-full max-w-6xl h-[90vh] bg-[#1E1F20] rounded-2xl flex flex-col border border-[#444746] overflow-hidden">
                   <div className="flex justify-between items-center p-4 border-b border-[#444746] bg-[#131314]">
-                      <h2 className="text-lg font-bold text-[#E3E3E3] truncate">{previewProduct.title} - Preview</h2>
-                      <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleCopyLink(`${window.location.origin}${window.location.pathname}#/market?product=${previewProduct.id}`)}
-                            className="p-2 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5] hover:text-[#E3E3E3] transition-colors"
-                            title="Copy Link"
-                          >
-                              <Copy className="w-5 h-5" />
-                          </button>
-                          <button 
-                            onClick={() => setPreviewProduct(null)}
-                            className="p-2 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5] hover:text-[#E3E3E3] transition-colors"
-                          >
-                              <X className="w-6 h-6" />
-                          </button>
-                      </div>
+                      <h2 className="text-lg font-bold text-[#E3E3E3] truncate">{previewProduct.title}</h2>
+                      <button onClick={() => setPreviewProduct(null)} className="p-2 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5]"><X className="w-6 h-6" /></button>
                   </div>
-                  <div className="flex-1 bg-[#000] overflow-hidden relative">
-                      {previewProduct.previewUrl ? (
-                          <iframe 
-                            src={previewProduct.previewUrl} 
-                            title="Template Preview"
-                            className="w-full h-full border-0"
-                            sandbox="allow-scripts allow-same-origin"
-                          />
-                      ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-[#131314]">
-                             <img src={previewProduct.imageUrl} loading="lazy" className="max-w-full max-h-full object-contain" alt="Preview" />
-                          </div>
-                      )}
+                  <div className="flex-1 bg-[#000]">
+                      {previewProduct.previewUrl ? <iframe src={previewProduct.previewUrl} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" /> : <img src={previewProduct.imageUrl} className="w-full h-full object-contain" />}
                   </div>
-                  <div className="p-4 border-t border-[#444746] bg-[#1E1F20] flex justify-between items-center">
-                        <div className="text-sm text-[#8E918F] hidden sm:block">
-                            {previewProduct.description}
-                        </div>
-                        
-                        {isPurchased(previewProduct.id) ? (
-                            <Button 
-                                className="bg-[#0F5223] text-[#C4EED0] hover:bg-[#136C2E]" 
-                                icon={Download}
-                                onClick={() => handleDownload(previewProduct)}
-                            >
-                                Download Owned Item
-                            </Button>
-                        ) : (
-                            <Button 
-                                variant={Number(previewProduct.price) === 0 ? 'secondary' : 'primary'}
-                                icon={Number(previewProduct.price) === 0 ? Download : ShoppingCart}
-                                onClick={(e) => handlePurchase(previewProduct, e)}
-                            >
-                                {Number(previewProduct.price) === 0 ? 'Download Template' : `Buy Template (₦${Number(previewProduct.price).toLocaleString()})`}
-                            </Button>
-                        )}
+                  <div className="p-4 border-t border-[#444746] flex justify-end">
+                        <Button icon={isPurchased(previewProduct.id) ? Download : ShoppingCart} onClick={() => isPurchased(previewProduct.id) ? handleDownload(previewProduct) : handlePurchase(previewProduct)}>{isPurchased(previewProduct.id) ? 'Download' : 'Buy Now'}</Button>
                   </div>
               </div>
           </div>
