@@ -5,11 +5,11 @@ import { useFeedback } from '../App';
 import { 
     getTutorCourses, getTutorStats, getQuestionsByTutor, replyToQuestion, updateCourse, getCurrentUser 
 } from '../services/mockData';
-import { Course, TutorQuestion, User, Module, Lesson } from '../types';
+import { Course, TutorQuestion, User, Module, Lesson, QuizQuestion } from '../types';
 import { Card, Button, Badge, Input, Textarea } from '../components/UI';
 import { 
     Loader2, BookOpen, Users, Wallet, MessageCircle, Edit, Save, X, Plus, Trash2, Send, 
-    Clock, GraduationCap, Video, FileText, ChevronRight 
+    Clock, GraduationCap, Video, FileText, ChevronRight, HelpCircle, Check, Paperclip
 } from 'lucide-react';
 
 export const TutorDashboard: React.FC = () => {
@@ -81,6 +81,21 @@ export const TutorDashboard: React.FC = () => {
         }
     };
 
+    // Helper to add a question to a quiz lesson
+    const addQuizQuestion = (mIdx: number, lIdx: number) => {
+        if (!editingCourse) return;
+        const mods = [...editingCourse.modules];
+        const lesson = mods[mIdx].lessons[lIdx];
+        const newQuestion: QuizQuestion = {
+            id: `q-${Date.now()}`,
+            question: 'New Question',
+            options: ['Option A', 'Option B', 'Option C', 'Option D'],
+            correctAnswer: 0
+        };
+        lesson.questions = [...(lesson.questions || []), newQuestion];
+        setEditingCourse({...editingCourse, modules: mods});
+    };
+
     if (loading) return <div className="min-h-screen flex items-center justify-center text-[#A8C7FA]"><Loader2 className="animate-spin w-12 h-12" /></div>;
 
     return (
@@ -143,13 +158,6 @@ export const TutorDashboard: React.FC = () => {
                             </div>
                         </Card>
                     ))}
-                    {courses.length === 0 && (
-                        <div className="md:col-span-2 py-40 text-center bg-[#1E1F20]/30 rounded-[48px] border-2 border-dashed border-[#444746]">
-                            <GraduationCap className="w-16 h-16 text-[#5E5E5E] mx-auto mb-6" />
-                            <h3 className="text-xl font-bold text-[#E3E3E3]">No courses assigned yet.</h3>
-                            <p className="text-[#8E918F] max-w-xs mx-auto mt-2">Contact Admin to get started as an instructor.</p>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -189,17 +197,10 @@ export const TutorDashboard: React.FC = () => {
                             )}
                         </Card>
                     ))}
-                    {questions.length === 0 && (
-                        <div className="py-40 text-center bg-[#1E1F20]/30 rounded-[48px] border-2 border-dashed border-[#444746]">
-                            <MessageCircle className="w-16 h-16 text-[#5E5E5E] mx-auto mb-6" />
-                            <h3 className="text-xl font-bold text-[#E3E3E3]">Inbox is empty</h3>
-                            <p className="text-[#8E918F]">Student inquiries will appear here.</p>
-                        </div>
-                    )}
                 </div>
             )}
 
-            {/* Curriculum Editor Modal (Shared with Admin logic) */}
+            {/* Curriculum Editor Modal */}
             {editingCourse && (
                 <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl z-[300] flex items-center justify-center p-4">
                     <Card className="w-full max-w-5xl h-[90vh] bg-[#1E1F20] border-[#444746] flex flex-col p-0">
@@ -208,80 +209,192 @@ export const TutorDashboard: React.FC = () => {
                             <button onClick={() => setEditingCourse(null)} className="p-2 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5]"><X className="w-6 h-6" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-10 no-scrollbar">
-                            <div className="max-w-3xl mx-auto space-y-10 pb-20">
+                            <div className="max-w-4xl mx-auto space-y-10 pb-20">
                                 {editingCourse.modules.map((m, mIdx) => (
-                                    <div key={m.id} className="space-y-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-8 h-8 rounded-full bg-[#A8C7FA]/10 flex items-center justify-center text-[10px] font-black text-[#A8C7FA] border border-[#A8C7FA]/20">{mIdx + 1}</div>
-                                            <Input 
-                                              value={m.title} 
-                                              onChange={e => {
-                                                  const mods = [...editingCourse.modules];
-                                                  mods[mIdx].title = e.target.value;
-                                                  setEditingCourse({...editingCourse, modules: mods});
-                                              }}
-                                              className="bg-transparent border-b border-t-0 border-x-0 rounded-none focus:ring-0 px-0 text-lg font-bold"
-                                            />
+                                    <div key={m.id} className="space-y-6">
+                                        <div className="flex items-center justify-between border-b border-[#444746] pb-4">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-[#A8C7FA]/10 flex items-center justify-center text-xs font-black text-[#A8C7FA] border border-[#A8C7FA]/20">{mIdx + 1}</div>
+                                                <Input 
+                                                  value={m.title} 
+                                                  onChange={e => {
+                                                      const mods = [...editingCourse.modules];
+                                                      mods[mIdx].title = e.target.value;
+                                                      setEditingCourse({...editingCourse, modules: mods});
+                                                  }}
+                                                  className="bg-transparent border-none rounded-none focus:ring-0 px-0 text-xl font-bold"
+                                                />
+                                            </div>
+                                            <button onClick={() => {
+                                                const mods = editingCourse.modules.filter((_, i) => i !== mIdx);
+                                                setEditingCourse({...editingCourse, modules: mods});
+                                            }} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-lg"><Trash2 className="w-5 h-5" /></button>
                                         </div>
-                                        <div className="pl-12 space-y-4">
+                                        
+                                        <div className="pl-6 md:pl-14 space-y-6">
                                             {m.lessons.map((l, lIdx) => (
-                                                <div key={l.id} className="p-4 bg-[#131314] rounded-2xl border border-[#444746] space-y-4">
+                                                <Card key={l.id} className="p-6 bg-[#131314] border-[#444746] space-y-6">
                                                     <div className="flex justify-between items-center">
-                                                        <Badge color="blue" className="text-[9px] uppercase font-black">{l.type}</Badge>
+                                                        <div className="flex gap-2">
+                                                            <select 
+                                                                value={l.type} 
+                                                                onChange={e => {
+                                                                    const mods = [...editingCourse.modules];
+                                                                    mods[mIdx].lessons[lIdx].type = e.target.value as any;
+                                                                    if (e.target.value === 'quiz' && !mods[mIdx].lessons[lIdx].questions) {
+                                                                        mods[mIdx].lessons[lIdx].questions = [];
+                                                                    }
+                                                                    setEditingCourse({...editingCourse, modules: mods});
+                                                                }}
+                                                                className="bg-[#1E1F20] text-[#A8C7FA] text-[10px] font-black uppercase tracking-widest border border-[#444746] rounded-full px-3 py-1 outline-none"
+                                                            >
+                                                                <option value="video">Video</option>
+                                                                <option value="text">Reading</option>
+                                                                <option value="quiz">Quiz</option>
+                                                            </select>
+                                                            {l.fileUrl && <Badge color="green" className="text-[10px] py-0 px-1.5"><Paperclip className="w-2.5 h-2.5 mr-1" /> Material Attached</Badge>}
+                                                        </div>
                                                         <button onClick={() => {
                                                             const mods = [...editingCourse.modules];
                                                             mods[mIdx].lessons = mods[mIdx].lessons.filter(item => item.id !== l.id);
                                                             setEditingCourse({...editingCourse, modules: mods});
-                                                        }} className="text-[#CF6679] hover:bg-[#CF6679]/10 p-1 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                                                        }} className="text-[#CF6679] hover:bg-[#CF6679]/10 p-2 rounded-xl"><Trash2 className="w-4 h-4" /></button>
                                                     </div>
-                                                    <Input 
-                                                      label="Lesson Title" 
-                                                      value={l.title} 
-                                                      onChange={e => {
-                                                        const mods = [...editingCourse.modules];
-                                                        mods[mIdx].lessons[lIdx].title = e.target.value;
-                                                        setEditingCourse({...editingCourse, modules: mods});
-                                                      }}
-                                                    />
-                                                    <Input 
-                                                      label={l.type === 'video' ? 'Video URL' : 'Content'} 
-                                                      value={l.content}
-                                                      onChange={e => {
-                                                        const mods = [...editingCourse.modules];
-                                                        mods[mIdx].lessons[lIdx].content = e.target.value;
-                                                        setEditingCourse({...editingCourse, modules: mods});
-                                                      }}
-                                                    />
-                                                </div>
+
+                                                    <div className="grid md:grid-cols-2 gap-4">
+                                                        <Input label="Lesson Name" value={l.title} onChange={e => {
+                                                            const mods = [...editingCourse.modules];
+                                                            mods[mIdx].lessons[lIdx].title = e.target.value;
+                                                            setEditingCourse({...editingCourse, modules: mods});
+                                                        }} />
+                                                        <Input label="Duration (e.g. 15m)" value={l.duration} onChange={e => {
+                                                            const mods = [...editingCourse.modules];
+                                                            mods[mIdx].lessons[lIdx].duration = e.target.value;
+                                                            setEditingCourse({...editingCourse, modules: mods});
+                                                        }} />
+                                                    </div>
+
+                                                    {l.type === 'video' && (
+                                                        <Input label="YouTube/Vimeo URL" placeholder="https://..." value={l.content} onChange={e => {
+                                                            const mods = [...editingCourse.modules];
+                                                            mods[mIdx].lessons[lIdx].content = e.target.value;
+                                                            setEditingCourse({...editingCourse, modules: mods});
+                                                        }} />
+                                                    )}
+
+                                                    {l.type === 'text' && (
+                                                        <Textarea label="Reading Content" rows={6} value={l.content} onChange={(e: any) => {
+                                                            const mods = [...editingCourse.modules];
+                                                            mods[mIdx].lessons[lIdx].content = e.target.value;
+                                                            setEditingCourse({...editingCourse, modules: mods});
+                                                        }} />
+                                                    )}
+
+                                                    {l.type === 'quiz' && (
+                                                        <div className="space-y-6 pt-4 border-t border-[#444746]/50">
+                                                            <div className="flex justify-between items-center">
+                                                                <h5 className="text-[10px] font-black uppercase text-[#8E918F] tracking-widest">Quiz Questions ({l.questions?.length || 0})</h5>
+                                                                <button onClick={() => addQuizQuestion(mIdx, lIdx)} className="text-[10px] text-[#A8C7FA] font-black uppercase flex items-center gap-1 hover:underline">
+                                                                    <Plus className="w-3 h-3" /> Add Question
+                                                                </button>
+                                                            </div>
+                                                            <div className="space-y-4">
+                                                                {l.questions?.map((q, qIdx) => (
+                                                                    <div key={q.id} className="p-5 bg-[#1E1F20] rounded-2xl border border-[#444746] relative">
+                                                                        <button onClick={() => {
+                                                                            const mods = [...editingCourse.modules];
+                                                                            mods[mIdx].lessons[lIdx].questions = mods[mIdx].lessons[lIdx].questions?.filter((_, i) => i !== qIdx);
+                                                                            setEditingCourse({...editingCourse, modules: mods});
+                                                                        }} className="absolute top-4 right-4 text-[#CF6679]"><X className="w-4 h-4" /></button>
+                                                                        
+                                                                        <div className="mb-4 pr-10">
+                                                                            <Input label={`Question ${qIdx + 1}`} value={q.question} onChange={e => {
+                                                                                const mods = [...editingCourse.modules];
+                                                                                mods[mIdx].lessons[lIdx].questions![qIdx].question = e.target.value;
+                                                                                setEditingCourse({...editingCourse, modules: mods});
+                                                                            }} />
+                                                                        </div>
+                                                                        
+                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                            {q.options.map((opt, oIdx) => (
+                                                                                <div key={oIdx} className="flex gap-2">
+                                                                                    <div className="flex-1 relative">
+                                                                                        <Input 
+                                                                                            value={opt} 
+                                                                                            className={q.correctAnswer === oIdx ? 'border-[#6DD58C] pr-10' : 'pr-10'}
+                                                                                            onChange={e => {
+                                                                                                const mods = [...editingCourse.modules];
+                                                                                                mods[mIdx].lessons[lIdx].questions![qIdx].options[oIdx] = e.target.value;
+                                                                                                setEditingCourse({...editingCourse, modules: mods});
+                                                                                            }} 
+                                                                                        />
+                                                                                        <button 
+                                                                                          onClick={() => {
+                                                                                              const mods = [...editingCourse.modules];
+                                                                                              mods[mIdx].lessons[lIdx].questions![qIdx].correctAnswer = oIdx;
+                                                                                              setEditingCourse({...editingCourse, modules: mods});
+                                                                                          }}
+                                                                                          className={`absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md transition-colors ${q.correctAnswer === oIdx ? 'bg-[#6DD58C] text-[#0F5223]' : 'text-[#5E5E5E] hover:text-[#E3E3E3]'}`}
+                                                                                        >
+                                                                                            <Check className="w-3 h-3" />
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="pt-4 border-t border-[#444746]/50">
+                                                        <div className="flex flex-col md:flex-row gap-4 items-end">
+                                                            <div className="flex-1 w-full">
+                                                                <Input 
+                                                                  label="Material Attachment URL (PDF/DOC/ZIP)" 
+                                                                  placeholder="https://cloud.nexlify.com.ng/..." 
+                                                                  value={l.fileUrl || ''} 
+                                                                  onChange={e => {
+                                                                    const mods = [...editingCourse.modules];
+                                                                    mods[mIdx].lessons[lIdx].fileUrl = e.target.value;
+                                                                    setEditingCourse({...editingCourse, modules: mods});
+                                                                  }}
+                                                                />
+                                                            </div>
+                                                            <p className="text-[10px] text-[#8E918F] pb-3 hidden md:block">Host files via <span className="text-[#A8C7FA] cursor-pointer" onClick={() => navigate('/admin/hosting')}>File Manager</span></p>
+                                                        </div>
+                                                    </div>
+                                                </Card>
                                             ))}
                                             <button 
                                               onClick={() => {
                                                 const mods = [...editingCourse.modules];
-                                                mods[mIdx].lessons.push({ id: `l-${Date.now()}`, title: 'New Lesson', type: 'video', content: '', duration: '15m' });
+                                                mods[mIdx].lessons.push({ id: `l-${Date.now()}`, title: 'New Lesson', type: 'video', content: '', duration: '10m' });
                                                 setEditingCourse({...editingCourse, modules: mods});
                                               }}
-                                              className="w-full py-4 border-2 border-dashed border-[#444746] rounded-2xl text-[10px] font-black uppercase text-[#8E918F] hover:text-[#E3E3E3] transition-all flex items-center justify-center gap-2"
+                                              className="w-full py-4 border-2 border-dashed border-[#444746] rounded-2xl text-[10px] font-black uppercase text-[#8E918F] hover:text-[#E3E3E3] hover:border-[#A8C7FA] transition-all flex items-center justify-center gap-2"
                                             >
-                                              <Plus className="w-3 h-3" /> Add Lesson
+                                              <Plus className="w-3 h-3" /> Add Lesson to Module
                                             </button>
                                         </div>
                                     </div>
                                 ))}
                                 <Button 
                                   variant="outline" 
-                                  className="w-full py-6 text-xs font-black uppercase tracking-widest"
+                                  className="w-full py-6 text-xs font-black uppercase tracking-widest bg-[#A8C7FA]/5 border-[#A8C7FA]/20"
                                   onClick={() => {
-                                      const newMod = { id: `m-${Date.now()}`, title: 'New Module', description: '', lessons: [] };
+                                      const newMod: Module = { id: `m-${Date.now()}`, title: 'New Module', description: '', lessons: [] };
                                       setEditingCourse({...editingCourse, modules: [...editingCourse.modules, newMod]});
                                   }}
                                 >
-                                    <Plus className="w-4 h-4 mr-2" /> Create New Module
+                                    <Plus className="w-4 h-4 mr-2" /> Add New Program Module
                                 </Button>
                             </div>
                         </div>
-                        <div className="p-6 bg-[#131314] border-t border-[#444746] flex gap-4">
-                            <Button variant="outline" className="flex-1" onClick={() => setEditingCourse(null)}>Discard</Button>
-                            <Button className="flex-1" icon={Save} isLoading={isSaving} onClick={handleSaveCourse}>Save Changes</Button>
+                        <div className="p-6 bg-[#131314] border-t border-[#444746] flex gap-4 shadow-[0_-10px_30px_rgba(0,0,0,0.5)]">
+                            <Button variant="outline" className="flex-1" onClick={() => setEditingCourse(null)}>Discard Changes</Button>
+                            <Button className="flex-1" icon={Save} isLoading={isSaving} onClick={handleSaveCourse}>Publish Curriculum</Button>
                         </div>
                     </Card>
                 </div>
