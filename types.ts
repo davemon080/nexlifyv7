@@ -148,3 +148,12 @@ export interface Enrollment {
   enrolledAt: string;
   progress: number;
 }
+
+// Added HostedFile interface to resolve missing type error
+export interface HostedFile {
+  id: string;
+  name: string;
+  mime_type: string;
+  content: string;
+  createdAt: string;
+}

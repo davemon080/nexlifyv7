@@ -19,7 +19,7 @@ import {
   Wallet, Search, MoreVertical, X, Check, 
   Upload, FileText, Download, Edit, Video, 
   GripVertical, Settings, Save, Globe, Eye, BookOpen, Bell, Send, HelpCircle, ChevronDown, ChevronUp, Link as LinkIcon, DownloadCloud,
-  Sparkles, Image as ImageIcon, DollarSign, Tag, Info, MessageSquare, Mail, Calendar, ExternalLink, UserCheck
+  Sparkles, Image as ImageIcon, DollarSign, Tag, Info, MessageSquare, Mail, Calendar, ExternalLink, UserCheck, Settings2
 } from 'lucide-react';
 
 export const Admin: React.FC = () => {
@@ -49,6 +49,13 @@ export const Admin: React.FC = () => {
   const [isEditingCourse, setIsEditingCourse] = useState(false);
   const [currentCourse, setCurrentCourse] = useState<Partial<Course>>({ title: '', modules: [] });
 
+  // Notifications State
+  const [notifForm, setNotifForm] = useState({ userId: 'all', title: '', message: '', type: 'info' as any });
+
+  // SEO State
+  const [seoPage, setSeoPage] = useState('/');
+  const [seoForm, setSeoForm] = useState<PageSeoConfig>({ path: '/', title: '', description: '', keywords: '' });
+
   useEffect(() => {
     const isAdmin = localStorage.getItem('isAdmin') === 'true';
     if (!isAdmin) navigate('/login');
@@ -67,6 +74,11 @@ export const Admin: React.FC = () => {
       setUsers(u);
       setAppSettings(s);
       setTotalRevenue(st.totalRevenue);
+      
+      // Update SEO form with current page settings if exists
+      if (s.seoDefinitions?.[seoPage]) {
+          setSeoForm(s.seoDefinitions[seoPage]);
+      }
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
@@ -151,6 +163,31 @@ export const Admin: React.FC = () => {
       await loadData();
   };
 
+  const handleSendNotif = async (e: React.FormEvent) => {
+      e.preventDefault();
+      await sendNotification({ ...notifForm, isBroadcast: notifForm.userId === 'all' });
+      showToast("Notification broadcasted successfully.", 'success');
+      setNotifForm({ userId: 'all', title: '', message: '', type: 'info' });
+  };
+
+  const handleSaveSeo = async () => {
+      const updatedSettings = { 
+          ...appSettings, 
+          seoDefinitions: { 
+              ...(appSettings.seoDefinitions || {}), 
+              [seoPage]: seoForm 
+          } 
+      };
+      await updateAppSettings(updatedSettings);
+      setAppSettings(updatedSettings);
+      showToast("SEO configurations saved.", 'success');
+  };
+
+  const handleSaveSettings = async () => {
+      await updateAppSettings(appSettings);
+      showToast("Platform settings updated.", 'success');
+  };
+
   if (loading && !showCourseModal && !showProductModal) return <div className="min-h-screen flex items-center justify-center text-[#A8C7FA]"><Loader2 className="animate-spin w-12 h-12" /></div>;
 
   return (
@@ -222,12 +259,187 @@ export const Admin: React.FC = () => {
 
                         <div className="mt-auto flex gap-2">
                             <Button size="sm" variant="outline" className="flex-1" icon={Edit} onClick={() => { setIsEditingCourse(true); setCurrentCourse(c); setShowCourseModal(true); }}>Curriculum</Button>
-                            <button onClick={() => deleteCourse(c.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-xl transition-colors"><Trash2 className="w-5 h-5" /></button>
+                            <button onClick={() => {
+                                showDialog({
+                                  title: 'Delete Course',
+                                  message: 'Are you sure you want to delete this course permanently?',
+                                  type: 'confirm',
+                                  onConfirm: () => deleteCourse(c.id).then(loadData)
+                                });
+                            }} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-xl transition-colors"><Trash2 className="w-5 h-5" /></button>
                         </div>
                     </Card>
                 ))}
             </div>
         </div>
+      )}
+
+      {activeTab === 'inquiries' && (
+          <div className="space-y-6">
+              <div className="flex justify-between items-center bg-[#1E1F20] p-6 rounded-3xl border border-[#444746]">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#E3E3E3]">Service Inquiries</h3>
+                    <p className="text-sm text-[#8E918F]">New project requests from users.</p>
+                  </div>
+                  <Badge color="purple">{inquiries.length} Total</Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {inquiries.map(inq => (
+                      <Card key={inq.id} className="p-6 border-[#444746] relative overflow-hidden group">
+                          <div className="flex items-start justify-between mb-6">
+                              <div className="flex items-center gap-4">
+                                  <div className="w-12 h-12 rounded-2xl bg-[#A8C7FA]/10 flex items-center justify-center text-[#A8C7FA]">
+                                      <MessageSquare className="w-6 h-6" />
+                                  </div>
+                                  <div>
+                                      <h4 className="font-bold text-[#E3E3E3]">{inq.name}</h4>
+                                      <div className="flex items-center gap-2 text-xs text-[#8E918F]">
+                                          <Mail className="w-3 h-3" /> {inq.email}
+                                      </div>
+                                  </div>
+                              </div>
+                              <button onClick={() => deleteInquiry(inq.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-xl">
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                          <div className="bg-[#131314] rounded-2xl p-4 mb-6">
+                              <Badge color="purple" className="mb-3 uppercase font-bold text-[10px]">{inq.serviceType}</Badge>
+                              <p className="text-sm text-[#C4C7C5] leading-relaxed">"{inq.message}"</p>
+                          </div>
+                          <div className="flex items-center justify-between text-[10px] font-bold text-[#5E5E5E] uppercase tracking-widest">
+                              <div className="flex items-center gap-2"><Calendar className="w-3.5 h-3.5" /> {new Date(inq.createdAt).toLocaleDateString()}</div>
+                              <a href={`mailto:${inq.email}`} className="text-[#A8C7FA] hover:underline flex items-center gap-1">Reply via Email <ExternalLink className="w-3 h-3" /></a>
+                          </div>
+                      </Card>
+                  ))}
+                  {inquiries.length === 0 && <div className="md:col-span-2 py-20 text-center text-[#8E918F]">No inquiries found.</div>}
+              </div>
+          </div>
+      )}
+
+      {activeTab === 'notifications' && (
+          <div className="max-w-2xl mx-auto">
+              <Card className="p-10 border-[#444746] bg-[#1E1F20]/50 backdrop-blur-xl shadow-2xl">
+                  <div className="flex items-center gap-4 mb-10">
+                      <div className="p-3 bg-[#A8C7FA]/10 rounded-2xl"><Bell className="w-8 h-8 text-[#A8C7FA]" /></div>
+                      <div>
+                          <h3 className="text-2xl font-bold text-[#E3E3E3]">Activity Hub Broadcast</h3>
+                          <p className="text-[#8E918F] text-sm">Send a notification to all users or a specific individual.</p>
+                      </div>
+                  </div>
+                  
+                  <form onSubmit={handleSendNotif} className="space-y-6">
+                      <div>
+                          <label className="block text-sm font-medium text-[#C4C7C5] mb-2 ml-1">Target Audience</label>
+                          <select 
+                            className="w-full bg-[#131314] border border-[#444746] rounded-2xl p-4 text-sm text-[#E3E3E3] outline-none focus:border-[#A8C7FA]"
+                            value={notifForm.userId}
+                            onChange={(e) => setNotifForm({...notifForm, userId: e.target.value})}
+                          >
+                              <option value="all">Global (All Active Users)</option>
+                              {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                          </select>
+                      </div>
+                      
+                      <Input label="Headline / Title" value={notifForm.title} onChange={(e) => setNotifForm({...notifForm, title: e.target.value})} required />
+                      
+                      <Textarea label="Message Content" rows={4} value={notifForm.message} onChange={(e: any) => setNotifForm({...notifForm, message: e.target.value})} required />
+                      
+                      <div>
+                          <label className="block text-sm font-medium text-[#C4C7C5] mb-2 ml-1">Notification Priority</label>
+                          <div className="grid grid-cols-4 gap-3">
+                              {['info', 'success', 'warning', 'danger'].map(type => (
+                                  <button 
+                                    key={type} 
+                                    type="button" 
+                                    onClick={() => setNotifForm({...notifForm, type})}
+                                    className={`py-3 rounded-xl text-xs font-bold uppercase transition-all ${notifForm.type === type ? 'bg-[#A8C7FA] text-[#062E6F]' : 'bg-[#131314] text-[#C4C7C5] border border-[#444746]'}`}
+                                  >
+                                      {type}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                      
+                      <Button type="submit" className="w-full py-4 text-xs font-black uppercase tracking-widest" icon={Send}>Broadcast Message</Button>
+                  </form>
+              </Card>
+          </div>
+      )}
+
+      {activeTab === 'seo' && (
+          <div className="max-w-4xl mx-auto space-y-10">
+              <Card className="p-8 border-[#444746]">
+                  <div className="flex items-center gap-4 mb-8">
+                      <div className="p-3 bg-[#9B72CB]/10 rounded-2xl"><Globe className="w-8 h-8 text-[#9B72CB]" /></div>
+                      <div>
+                          <h3 className="text-2xl font-bold text-[#E3E3E3]">Page SEO Configuration</h3>
+                          <p className="text-[#8E918F] text-sm">Optimize your platform's visibility for search engines.</p>
+                      </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-12 gap-10">
+                      <div className="md:col-span-4 border-r border-[#444746] pr-6">
+                          <label className="block text-[10px] font-black uppercase text-[#8E918F] mb-4">Target Page</label>
+                          <div className="space-y-2">
+                              {['/', '/training', '/market', '/ai-tools', '/hire', '/earn'].map(path => (
+                                  <button 
+                                    key={path} 
+                                    onClick={() => {
+                                        setSeoPage(path);
+                                        const config = appSettings.seoDefinitions?.[path] || { path, title: '', description: '', keywords: '' };
+                                        setSeoForm(config);
+                                    }}
+                                    className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${seoPage === path ? 'bg-[#A8C7FA]/10 text-[#A8C7FA] border border-[#A8C7FA]/20' : 'text-[#C4C7C5] hover:bg-[#131314]'}`}
+                                  >
+                                      {path === '/' ? 'Home' : path.substring(1).charAt(0).toUpperCase() + path.slice(2)}
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+                      
+                      <div className="md:col-span-8 space-y-6">
+                          <Input label="Meta Title" value={seoForm.title} onChange={(e) => setSeoForm({...seoForm, title: e.target.value})} />
+                          <Textarea label="Meta Description" rows={3} value={seoForm.description} onChange={(e: any) => setSeoForm({...seoForm, description: e.target.value})} />
+                          <Input label="Keywords (Comma separated)" value={seoForm.keywords} onChange={(e) => setSeoForm({...seoForm, keywords: e.target.value})} />
+                          <Input label="OG Image URL" value={seoForm.ogImage} onChange={(e) => setSeoForm({...seoForm, ogImage: e.target.value})} />
+                          <Button className="w-full" icon={Save} onClick={handleSaveSeo}>Update SEO for {seoPage}</Button>
+                      </div>
+                  </div>
+              </Card>
+          </div>
+      )}
+
+      {activeTab === 'settings' && (
+          <div className="max-w-2xl mx-auto">
+              <Card className="p-10 border-[#444746]">
+                  <div className="flex items-center gap-4 mb-10">
+                      <div className="p-3 bg-[#D96570]/10 rounded-2xl"><Settings2 className="w-8 h-8 text-[#D96570]" /></div>
+                      <div>
+                          <h3 className="text-2xl font-bold text-[#E3E3E3]">Platform Configuration</h3>
+                          <p className="text-[#8E918F] text-sm">Global branding and administrative settings.</p>
+                      </div>
+                  </div>
+                  
+                  <div className="space-y-8">
+                      <Input 
+                        label="Platform Identity (Brand Name)" 
+                        value={appSettings.platformName} 
+                        onChange={(e) => setAppSettings({...appSettings, platformName: e.target.value})} 
+                      />
+                      
+                      <Input 
+                        label="Platform Logo URL" 
+                        value={appSettings.logoUrl} 
+                        onChange={(e) => setAppSettings({...appSettings, logoUrl: e.target.value})} 
+                      />
+                      
+                      <div className="pt-4 border-t border-[#444746]">
+                          <Button className="w-full py-4" icon={Save} onClick={handleSaveSettings}>Save Platform Settings</Button>
+                      </div>
+                  </div>
+              </Card>
+          </div>
       )}
 
       {/* Course Curriculum Builder Modal */}
@@ -253,83 +465,6 @@ export const Admin: React.FC = () => {
                           <Button icon={Save} className="w-full" onClick={handleSaveCourse}>Save Course</Button>
                       </div>
                   </div>
-              </div>
-          </div>
-      )}
-
-      {activeTab === 'products' && (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center bg-[#1E1F20] p-6 rounded-3xl border border-[#444746]">
-                <div>
-                  <h3 className="text-xl font-bold text-[#E3E3E3]">Digital Marketplace</h3>
-                  <p className="text-sm text-[#8E918F]">Manage assets, templates, and ebooks.</p>
-                </div>
-                <Button icon={Plus} onClick={() => { setIsEditingProduct(false); setCurrentProduct({ title: '', price: 0, category: ProductCategory.TEMPLATE, description: '', imageUrl: '', previewUrl: '', downloadUrl: '' }); setShowProductModal(true); }}>Add Product</Button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {products.map(p => (
-                    <Card key={p.id} className="p-4 group relative flex flex-col h-full hover:border-[#A8C7FA]/50 transition-all duration-300">
-                        <img src={p.imageUrl} className="w-full h-40 object-cover rounded-xl mb-4 bg-[#131314]" />
-                        <div className="flex justify-between items-start mb-2">
-                           <Badge color="blue" className="text-[10px] uppercase font-bold">{p.category}</Badge>
-                           <p className="text-sm font-bold text-[#6DD58C]">₦{p.price.toLocaleString()}</p>
-                        </div>
-                        <h4 className="font-bold text-[#E3E3E3] truncate mb-2">{p.title}</h4>
-                        <p className="text-[10px] text-[#8E918F] line-clamp-2 mb-4 flex-grow">{p.description}</p>
-                        <div className="flex gap-2 pt-3 border-t border-[#444746]">
-                            <Button size="sm" variant="outline" className="flex-1" icon={Edit} onClick={() => { setIsEditingProduct(true); setCurrentProduct(p); setShowProductModal(true); }}>Edit</Button>
-                            <button onClick={() => {
-                              showDialog({
-                                title: 'Delete Product',
-                                message: 'Are you sure? This action cannot be undone.',
-                                type: 'confirm',
-                                onConfirm: () => deleteProduct(p.id).then(loadData)
-                              });
-                            }} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                    </Card>
-                ))}
-            </div>
-        </div>
-      )}
-
-      {activeTab === 'users' && (
-          <div className="space-y-6">
-              <div className="flex gap-4">
-                  <div className="relative flex-1">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8E918F]" />
-                      <input type="text" placeholder="Search by name or email..." className="w-full bg-[#1E1F20] border border-[#444746] rounded-2xl py-3.5 pl-12 pr-4 text-[#E3E3E3]" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
-                  </div>
-              </div>
-              <div className="bg-[#1E1F20] rounded-3xl border border-[#444746] overflow-hidden">
-                  <table className="w-full text-left">
-                      <thead className="bg-[#131314] text-[10px] font-black uppercase text-[#8E918F]">
-                          <tr>
-                              <th className="px-6 py-4">User Details</th>
-                              <th className="px-6 py-4">Role</th>
-                              <th className="px-6 py-4">Wallet</th>
-                              <th className="px-6 py-4 text-right">Manage</th>
-                          </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#444746]">
-                          {users.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase())).map(u => (
-                              <tr key={u.id} className="hover:bg-[#2D2E30] transition-colors cursor-pointer" onClick={() => setSelectedUser(u)}>
-                                  <td className="px-6 py-4">
-                                      <div className="flex items-center gap-3">
-                                          <div className="w-10 h-10 rounded-full bg-[#A8C7FA]/10 flex items-center justify-center text-[#A8C7FA] font-bold text-sm">{u.name.charAt(0)}</div>
-                                          <div>
-                                              <p className="text-sm font-bold text-[#E3E3E3]">{u.name}</p>
-                                              <p className="text-[10px] text-[#8E918F]">{u.email}</p>
-                                          </div>
-                                      </div>
-                                  </td>
-                                  <td className="px-6 py-4"><Badge color={u.role === 'admin' ? 'purple' : u.role === 'tutor' ? 'blue' : 'green'}>{u.role}</Badge></td>
-                                  <td className="px-6 py-4 text-sm font-mono text-[#6DD58C]">₦{u.balance.toLocaleString()}</td>
-                                  <td className="px-6 py-4 text-right"><MoreVertical className="w-5 h-5 ml-auto text-[#5E5E5E]" /></td>
-                              </tr>
-                          ))}
-                      </tbody>
-                  </table>
               </div>
           </div>
       )}

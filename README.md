@@ -20,6 +20,12 @@ In your Vercel Project Dashboard (Settings > Environment Variables), add the fol
 Run the following SQL commands in your Neon SQL Editor to create the necessary tables.
 
 ```sql
+-- Settings Table (for Platform Brand, Logo, and dynamic SEO)
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL
+);
+
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -48,7 +54,7 @@ CREATE TABLE IF NOT EXISTS courses (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tutor Questions Table
+-- Tutor Questions Table (For student interaction)
 CREATE TABLE IF NOT EXISTS tutor_questions (
     id TEXT PRIMARY KEY,
     course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
@@ -76,16 +82,44 @@ CREATE TABLE IF NOT EXISTS enrollments (
   enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, course_id)
 );
+
+-- Inquiries Table
+CREATE TABLE IF NOT EXISTS inquiries (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    message TEXT NOT NULL,
+    service_type TEXT NOT NULL,
+    status TEXT DEFAULT 'new',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT DEFAULT 'info',
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
 ### Required Updates for Existing Databases
-If you have already created your database, run these commands:
+If you have already created your database, run these commands to add the new Tutor Support and Global Settings features:
 
 ```sql
--- Support Tutor assignment
+-- Settings for Global Brand/SEO
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL
+);
+
+-- Support Tutor assignment on existing courses
 ALTER TABLE courses ADD COLUMN IF NOT EXISTS tutor_id TEXT REFERENCES users(id);
 
--- Create Questions Table
+-- Create Questions Table for interactions
 CREATE TABLE IF NOT EXISTS tutor_questions (
     id TEXT PRIMARY KEY,
     course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,

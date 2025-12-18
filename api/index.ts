@@ -23,21 +23,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const action = req.query.action as string;
     const body = req.body || {};
 
-    // Ensure necessary tables exist
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS tutor_questions (
-            id TEXT PRIMARY KEY,
-            course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
-            lesson_id TEXT,
-            student_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-            student_name TEXT,
-            question TEXT NOT NULL,
-            reply TEXT,
-            replied_at TIMESTAMP,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
+    // --- APP SETTINGS & SEO ---
+    if (action === 'getAppSettings') {
+        const { rows } = await pool.query('SELECT value FROM settings WHERE key = \'app_config\'');
+        if (rows.length === 0) return res.status(200).json({ platformName: 'Nexlify' });
+        return res.status(200).json(rows[0].value);
+    }
 
+    if (action === 'updateAppSettings') {
+        await pool.query(
+            'INSERT INTO settings (key, value) VALUES (\'app_config\', $1) ON CONFLICT (key) DO UPDATE SET value = $1',
+            [JSON.stringify(body)]
+        );
+        return res.status(200).json({ success: true });
+    }
+
+    // --- TUTOR SERVICES ---
     if (action === 'getTutorCourses') {
         const tutorId = req.query.tutorId;
         const { rows } = await pool.query('SELECT * FROM courses WHERE tutor_id = $1', [tutorId]);
@@ -132,10 +133,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (rows.length === 0) return res.status(401).json({ error: 'Invalid credentials' });
       const user = rows[0];
       if (user.status === 'suspended' || user.status === 'banned') return res.status(403).json({ error: 'Account suspended' });
+      
       const { rows: enrollRows } = await pool.query('SELECT course_id FROM enrollments WHERE user_id = $1', [user.id]);
       const enrolledCourses = enrollRows.map((e: any) => e.course_id);
+      
       const { rows: purchaseRows } = await pool.query('SELECT product_id FROM purchases WHERE user_id = $1', [user.id]);
       const purchasedProducts = purchaseRows.map((e: any) => e.product_id);
+      
       return res.status(200).json({
         id: user.id, name: user.name, email: user.email, role: user.role,
         balance: parseFloat(user.balance), status: user.status, photoUrl: user.photo_url,
@@ -163,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- COURSES ---
     if (action === 'getCourses') {
-      const { rows } = await pool.query('SELECT * FROM courses');
+      const { rows } = await pool.query('SELECT * FROM courses ORDER BY created_at DESC');
       return res.status(200).json(rows.map((c: any) => ({ ...c, tutorId: c.tutor_id, price: parseFloat(c.price), modules: c.modules_json || [] })));
     }
     
@@ -193,15 +197,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true });
     }
 
-    // --- REST OF ACTIONS (PRODUCTS, INQUIRIES, etc.) ---
-    if (action === 'getProducts') {
-      const { rows } = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
-      return res.status(200).json(rows.map((p: any) => ({ id: p.id, title: p.title, description: p.description, category: p.category, price: parseFloat(p.price), imageUrl: p.image_url, previewUrl: p.preview_url, downloadUrl: p.download_url, createdAt: p.created_at })));
+    if (action === 'deleteCourse') {
+        const id = body.id;
+        await pool.query('DELETE FROM enrollments WHERE course_id = $1', [id]);
+        await pool.query('DELETE FROM courses WHERE id = $1', [id]);
+        return res.status(200).json({ success: true });
     }
 
+    // --- PRODUCTS ---
+    if (action === 'getProducts') {
+      const { rows } = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
+      return res.status(200).json(rows.map((p: any) => ({ ...p, price: parseFloat(p.price), imageUrl: p.image_url, previewUrl: p.preview_url, downloadUrl: p.download_url })));
+    }
+
+    if (action === 'addProduct') {
+      const { id, title, description, category, price, imageUrl, previewUrl, downloadUrl } = body;
+      await pool.query(
+        'INSERT INTO products (id, title, description, category, price, image_url, preview_url, download_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+        [id, title, description, category, price, imageUrl, previewUrl, downloadUrl]
+      );
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'updateProduct') {
+      const { id, title, description, category, price, imageUrl, previewUrl, downloadUrl } = body;
+      await pool.query(
+        'UPDATE products SET title=$1, description=$2, category=$3, price=$4, image_url=$5, preview_url=$6, download_url=$7 WHERE id=$8',
+        [title, description, category, price, imageUrl, previewUrl, downloadUrl, id]
+      );
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === 'deleteProduct') {
+      await pool.query('DELETE FROM products WHERE id = $1', [body.id]);
+      return res.status(200).json({ success: true });
+    }
+
+    // --- USERS ---
     if (action === 'getAllUsers') {
       const { rows } = await pool.query('SELECT id, name, email, role, balance, status, created_at FROM users ORDER BY created_at DESC');
-      return res.status(200).json(rows.map((u: any) => ({ id: u.id, name: u.name, email: u.email, role: u.role, balance: parseFloat(u.balance), status: u.status, joinedAt: u.created_at })));
+      return res.status(200).json(rows.map((u: any) => ({ ...u, joinedAt: u.created_at, balance: parseFloat(u.balance) })));
     }
 
     if (action === 'updateUser') {
@@ -210,9 +245,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true });
     }
 
+    // --- INQUIRIES ---
+    if (action === 'submitInquiry') {
+      const { id, name, email, message, serviceType } = body;
+      await pool.query(
+        'INSERT INTO inquiries (id, name, email, message, service_type) VALUES ($1, $2, $3, $4, $5)',
+        [id, name, email, message, serviceType]
+      );
+      return res.status(200).json({ success: true });
+    }
+
     if (action === 'getInquiries') {
         const { rows } = await pool.query('SELECT * FROM inquiries ORDER BY created_at DESC');
-        return res.status(200).json(rows);
+        return res.status(200).json(rows.map((i: any) => ({ ...i, serviceType: i.service_type, createdAt: i.created_at })));
+    }
+
+    if (action === 'deleteInquiry') {
+        await pool.query('DELETE FROM inquiries WHERE id = $1', [body.id]);
+        return res.status(200).json({ success: true });
+    }
+
+    // --- ENROLLMENT ---
+    if (action === 'enroll') {
+        const { userId, courseId } = body;
+        await pool.query('INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [userId, courseId]);
+        return res.status(200).json({ success: true });
+    }
+
+    if (action === 'checkEnrollment') {
+        const { userId, courseId } = req.query;
+        const { rows } = await pool.query('SELECT 1 FROM enrollments WHERE user_id=$1 AND course_id=$2', [userId, courseId]);
+        return res.status(200).json(rows.length > 0);
     }
 
     if (action === 'getAdminStats') {
