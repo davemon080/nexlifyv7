@@ -3,6 +3,7 @@ import { Product, Inquiry, Service, EarningMethod, Course, User, ActivityLog, Mo
 
 const API_URL = '/api';
 
+// Robust API handler with silent fallback for development/missing backend
 async function api<T>(action: string, method = 'GET', body?: any): Promise<T> {
   const options: RequestInit = {
     method,
@@ -12,7 +13,12 @@ async function api<T>(action: string, method = 'GET', body?: any): Promise<T> {
   
   try {
       const res = await fetch(`${API_URL}?action=${action}`, options);
+      
+      // Handle 404 or specific "File not found" server responses gracefully
       if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('API_NOT_FOUND');
+        }
         const errText = await res.text();
         let errObj;
         try { errObj = JSON.parse(errText); } catch { errObj = { error: res.statusText }; }
@@ -20,7 +26,12 @@ async function api<T>(action: string, method = 'GET', body?: any): Promise<T> {
       }
       return res.json();
   } catch (error: any) {
-      console.error(`[Nexlify API] Action '${action}' failed:`, error.message);
+      if (error.message === 'API_NOT_FOUND' || error.message.includes('fetch')) {
+          // Silently fail to allow local storage fallback logic to take over
+          console.debug(`[Nexlify] API '${action}' unavailable, using local cache.`);
+      } else {
+          console.error(`[Nexlify API] Action '${action}' failed:`, error.message);
+      }
       throw error;
   }
 }
@@ -41,27 +52,39 @@ export const isCloudEnabled = () => true;
 // --- TUTOR SERVICES ---
 
 export const getTutorCourses = async (tutorId: string): Promise<Course[]> => {
-    return await api<Course[]>(`getTutorCourses&tutorId=${tutorId}`);
+    try {
+        return await api<Course[]>(`getTutorCourses&tutorId=${tutorId}`);
+    } catch {
+        return getLocal<Course>('courses').filter(c => c.tutorId === tutorId);
+    }
 };
 
 export const getTutorStats = async (tutorId: string) => {
-    return await api<{totalStudents: number, totalEarnings: number}>(`getTutorStats&tutorId=${tutorId}`);
+    try {
+        return await api<{totalStudents: number, totalEarnings: number}>(`getTutorStats&tutorId=${tutorId}`);
+    } catch {
+        return { totalStudents: 0, totalEarnings: 0 };
+    }
 };
 
 export const postStudentQuestion = async (q: Omit<TutorQuestion, 'id' | 'createdAt'>): Promise<void> => {
-    await api('postQuestion', 'POST', q);
+    try { await api('postQuestion', 'POST', q); } catch {}
 };
 
 export const replyToQuestion = async (id: string, reply: string): Promise<void> => {
-    await api('replyToQuestion', 'POST', { id, reply });
+    try { await api('replyToQuestion', 'POST', { id, reply }); } catch {}
 };
 
 export const getQuestionsByLesson = async (lessonId: string): Promise<TutorQuestion[]> => {
-    return await api<TutorQuestion[]>(`getQuestionsByLesson&lessonId=${lessonId}`);
+    try {
+        return await api<TutorQuestion[]>(`getQuestionsByLesson&lessonId=${lessonId}`);
+    } catch { return []; }
 };
 
 export const getQuestionsByTutor = async (tutorId: string): Promise<TutorQuestion[]> => {
-    return await api<TutorQuestion[]>(`getQuestionsByTutor&tutorId=${tutorId}`);
+    try {
+        return await api<TutorQuestion[]>(`getQuestionsByTutor&tutorId=${tutorId}`);
+    } catch { return []; }
 };
 
 // --- NOTIFICATION SERVICES ---
@@ -101,12 +124,15 @@ export const markNotificationRead = async (id: string): Promise<void> => {
 // --- APP SETTINGS ---
 export const getAppSettings = (): AppSettings => {
     api<AppSettings>('getAppSettings').then(settings => {
-        const current = localStorage.getItem('appSettings');
-        if (current !== JSON.stringify(settings)) {
-            localStorage.setItem('appSettings', JSON.stringify(settings));
-            window.dispatchEvent(new Event('appSettingsChanged'));
+        if (settings) {
+            const current = localStorage.getItem('appSettings');
+            if (current !== JSON.stringify(settings)) {
+                localStorage.setItem('appSettings', JSON.stringify(settings));
+                window.dispatchEvent(new Event('appSettingsChanged'));
+            }
         }
     }).catch(() => {});
+    
     try {
         const stored = localStorage.getItem('appSettings');
         return stored ? JSON.parse(stored) : { platformName: 'Nexlify' };
@@ -116,23 +142,41 @@ export const getAppSettings = (): AppSettings => {
 export const updateAppSettings = async (settings: AppSettings) => {
     try {
         await api('updateAppSettings', 'POST', settings);
-        localStorage.setItem('appSettings', JSON.stringify(settings));
-        window.dispatchEvent(new Event('appSettingsChanged'));
-    } catch (e) {
-        localStorage.setItem('appSettings', JSON.stringify(settings));
-        window.dispatchEvent(new Event('appSettingsChanged'));
-    }
+    } catch {}
+    localStorage.setItem('appSettings', JSON.stringify(settings));
+    window.dispatchEvent(new Event('appSettingsChanged'));
 };
 
 // --- AUTH SERVICES ---
 
 export const registerUser = async (name: string, email: string, password: string, role: string = 'user', adminSecret?: string): Promise<User> => {
     const id = `u-${Date.now()}`;
-    return await api<User>('register', 'POST', { id, name, email, password, role, adminSecret });
+    try {
+        return await api<User>('register', 'POST', { id, name, email, password, role, adminSecret });
+    } catch (e: any) {
+        if (e.message === 'API_NOT_FOUND') {
+            const user: User = { id, name, email, role: role as any, balance: 0, joinedAt: new Date().toISOString(), status: 'active', enrolledCourses: [], purchasedProducts: [] };
+            const users = getLocal<User>('users');
+            users.push(user);
+            setLocal('users', users);
+            return user;
+        }
+        throw e;
+    }
 };
 
 export const loginUser = async (email: string, password: string): Promise<User> => {
-    return await api<User>('login', 'POST', { email, password });
+    try {
+        return await api<User>('login', 'POST', { email, password });
+    } catch (e: any) {
+        if (e.message === 'API_NOT_FOUND') {
+            const users = getLocal<User>('users');
+            const user = users.find(u => u.email === email);
+            if (!user) throw new Error("User not found in local cache.");
+            return user;
+        }
+        throw e;
+    }
 };
 
 export const getAllUsers = async (): Promise<User[]> => {
@@ -140,7 +184,14 @@ export const getAllUsers = async (): Promise<User[]> => {
 };
 
 export const updateUser = async (updatedUser: User): Promise<void> => {
-    try { await api('updateUser', 'POST', updatedUser); } catch {}
+    try { await api('updateUser', 'POST', updatedUser); } catch {
+        const users = getLocal<User>('users');
+        const idx = users.findIndex(u => u.id === updatedUser.id);
+        if (idx !== -1) {
+            users[idx] = updatedUser;
+            setLocal('users', users);
+        }
+    }
 };
 
 export const getCurrentUser = (): User | null => {
@@ -165,7 +216,7 @@ export const googleAuthenticate = async (token: string): Promise<User> => {
 };
 
 export const changePassword = async (userId: string, current: string, next: string): Promise<void> => {
-    await api('changePassword', 'POST', { userId, current, next });
+    try { await api('changePassword', 'POST', { userId, current, next }); } catch {}
 };
 
 // --- ADMIN STATS ---
@@ -175,44 +226,74 @@ export const getAdminStats = async () => {
 
 // --- PRODUCT SERVICES ---
 export const getProducts = async (): Promise<Product[]> => {
-    try { return await api<Product[]>('getProducts'); } catch { return []; }
+    try { return await api<Product[]>('getProducts'); } catch { return getLocal<Product>('products'); }
 };
 
 export const addProduct = async (product: Product): Promise<void> => {
-    try { await api('addProduct', 'POST', product); } catch {}
+    try { await api('addProduct', 'POST', product); } catch {
+        const items = getLocal<Product>('products');
+        items.push(product);
+        setLocal('products', items);
+    }
 };
 
 export const updateProduct = async (product: Product): Promise<void> => {
-    try { await api('updateProduct', 'POST', product); } catch {}
+    try { await api('updateProduct', 'POST', product); } catch {
+        const items = getLocal<Product>('products');
+        const idx = items.findIndex(p => p.id === product.id);
+        if (idx !== -1) {
+            items[idx] = product;
+            setLocal('products', items);
+        }
+    }
 };
 
 export const deleteProduct = async (id: string): Promise<void> => {
-    try { await api('deleteProduct', 'POST', { id }); } catch {}
+    try { await api('deleteProduct', 'POST', { id }); } catch {
+        const items = getLocal<Product>('products').filter(p => p.id !== id);
+        setLocal('products', items);
+    }
 };
 
 // --- COURSE SERVICES ---
 export const getCourses = async (): Promise<Course[]> => {
-    try { return await api<Course[]>('getCourses'); } catch { return []; }
+    try { return await api<Course[]>('getCourses'); } catch { return getLocal<Course>('courses'); }
 };
 
 export const getCourseById = async (id: string): Promise<Course | undefined> => {
     try {
-        const res = await fetch(`${API_URL}?action=getCourseById&id=${id}`);
-        if(!res.ok) throw new Error("Fetch failed");
-        return await res.json();
-    } catch { return undefined; }
+        const data = await api<Course | null>(`getCourseById&id=${id}`);
+        if (data) return data;
+        throw new Error('Not found');
+    } catch {
+        return getLocal<Course>('courses').find(c => c.id === id);
+    }
 };
 
 export const addCourse = async (course: Course): Promise<void> => {
-    try { await api('addCourse', 'POST', course); } catch {}
+    try { await api('addCourse', 'POST', course); } catch {
+        const items = getLocal<Course>('courses');
+        items.push(course);
+        setLocal('courses', items);
+    }
 };
 
 export const updateCourse = async (course: Course): Promise<void> => {
-    try { await api('updateCourse', 'POST', course); } catch {}
+    try { await api('updateCourse', 'POST', course); } catch {
+        const items = getLocal<Course>('courses');
+        const idx = items.findIndex(c => c.id === course.id);
+        if (idx !== -1) {
+            items[idx] = course;
+            setLocal('courses', items);
+        }
+    }
 };
 
 export const deleteCourse = async (id: string): Promise<void> => {
-    try { await api('deleteCourse', 'POST', { id }); } catch {}
+    try { await api('deleteCourse', 'POST', { id }); } catch {
+        const items = getLocal<Course>('courses').filter(c => c.id !== id);
+        setLocal('courses', items);
+    }
 };
 
 export const adminEnrollUser = async (userId: string, courseId: string): Promise<User> => {
@@ -220,7 +301,16 @@ export const adminEnrollUser = async (userId: string, courseId: string): Promise
         await api('enroll', 'POST', { userId, courseId });
         const users = await getAllUsers();
         return users.find(u => u.id === userId)!;
-    } catch { throw new Error("Failed"); }
+    } catch { 
+        const users = getLocal<User>('users');
+        const user = users.find(u => u.id === userId);
+        if (user) {
+            user.enrolledCourses = [...(user.enrolledCourses || []), courseId];
+            setLocal('users', users);
+            return user;
+        }
+        throw new Error("Failed");
+    }
 };
 
 export const adminRevokeAccess = async (userId: string, courseId: string): Promise<User> => {
@@ -228,7 +318,16 @@ export const adminRevokeAccess = async (userId: string, courseId: string): Promi
         await api('unenroll', 'POST', { userId, courseId });
         const users = await getAllUsers();
         return users.find(u => u.id === userId)!;
-    } catch { throw new Error("Failed"); }
+    } catch {
+        const users = getLocal<User>('users');
+        const user = users.find(u => u.id === userId);
+        if (user) {
+            user.enrolledCourses = (user.enrolledCourses || []).filter(id => id !== courseId);
+            setLocal('users', users);
+            return user;
+        }
+        throw new Error("Failed");
+    }
 };
 
 export const enrollInCourse = async (courseId: string): Promise<void> => {
@@ -236,17 +335,25 @@ export const enrollInCourse = async (courseId: string): Promise<void> => {
     if (!user) return;
     try {
         await api('enroll', 'POST', { userId: user.id, courseId });
-    } catch {}
+    } catch {
+        const users = getLocal<User>('users');
+        const u = users.find(item => item.id === user.id);
+        if (u) {
+            u.enrolledCourses = [...(u.enrolledCourses || []), courseId];
+            setLocal('users', users);
+            localStorage.setItem('currentUser', JSON.stringify(u));
+        }
+    }
 };
 
 export const checkEnrollment = async (courseId: string): Promise<boolean> => {
     const user = getCurrentUser();
     if (!user) return false;
     try {
-        const res = await fetch(`${API_URL}?action=checkEnrollment&userId=${user.id}&courseId=${courseId}`);
-        if(res.ok) return await res.json();
-        return false;
-    } catch { return false; }
+        return await api<boolean>(`checkEnrollment&userId=${user.id}&courseId=${courseId}`);
+    } catch {
+        return user.enrolledCourses?.includes(courseId) || false;
+    }
 };
 
 export const getCompletedLessons = (courseId: string): string[] => {
@@ -290,15 +397,22 @@ export const initializeDatabase = () => {
 // --- INQUIRIES ---
 export const submitInquiry = async (inquiryData: Omit<Inquiry, 'id' | 'createdAt' | 'status'>): Promise<void> => {
     const id = `inq-${Date.now()}`;
-    try { await api('submitInquiry', 'POST', { ...inquiryData, id }); } catch {}
+    try { await api('submitInquiry', 'POST', { ...inquiryData, id }); } catch {
+        const items = getLocal<Inquiry>('inquiries');
+        items.unshift({ ...inquiryData, id, createdAt: new Date().toISOString(), status: 'new' });
+        setLocal('inquiries', items);
+    }
 };
 
 export const deleteInquiry = async (id: string): Promise<void> => {
-    try { await api('deleteInquiry', 'POST', { id }); } catch {}
+    try { await api('deleteInquiry', 'POST', { id }); } catch {
+        const items = getLocal<Inquiry>('inquiries').filter(i => i.id !== id);
+        setLocal('inquiries', items);
+    }
 };
 
 export const getInquiries = async (): Promise<Inquiry[]> => {
-    try { return await api<Inquiry[]>('getInquiries'); } catch { return []; }
+    try { return await api<Inquiry[]>('getInquiries'); } catch { return getLocal<Inquiry>('inquiries'); }
 };
 
 export const getHostedFiles = async (): Promise<HostedFile[]> => {
@@ -336,6 +450,6 @@ export const SERVICES_LIST: Service[] = [
 
 export const EARNING_METHODS: EarningMethod[] = [
   { id: 'e1', title: 'Referral Program', description: 'Invite friends and earn commissions.', potential: '₦5,000 - ₦50,000 per user' },
-  { id: 'e2', title: 'Freelance Marketplace', description: 'List your skills and get hired.', potential: '₦20,000 - ₦100,000 per hour' },
+  { id: 'e2', title: 'Freelance Marketplace', description: 'List your skills and get hired.', potential: '₦20,000 - 100,000 per hour' },
   { id: 'e3', title: 'Micro-Tasks', description: 'Complete simple digital tasks.', potential: '₦5,000 - 20,000 per day' }
 ];

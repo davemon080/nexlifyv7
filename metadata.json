@@ -1,5 +1,8 @@
 {
-  "name": "Copy of Nexlify",
+  "name": "Nexlify",
   "description": "A multi-service digital platform combining a digital agency, marketplace, talent hub, and earning platform.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }

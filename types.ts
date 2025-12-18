@@ -149,7 +149,6 @@ export interface Enrollment {
   progress: number;
 }
 
-// Added HostedFile interface to resolve missing type error
 export interface HostedFile {
   id: string;
   name: string;
