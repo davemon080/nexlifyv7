@@ -1,3 +1,4 @@
+
 # Nexlify Database Setup (Neon Postgres on Vercel)
 
 This project is configured to run on Vercel with a Neon PostgreSQL database backend using `@neondatabase/serverless`.
@@ -14,7 +15,6 @@ In your Vercel Project Dashboard (Settings > Environment Variables), add the fol
 
 ### Admin Security
 - `ADMIN_SECRET`: `your_secure_secret_code_here` (e.g., admin2024)
-  *   *This key is used to validate admin registration requests server-side.*
 
 ## 3. Create Schema
 Run the following SQL commands in your Neon SQL Editor to create the necessary tables.
@@ -26,42 +26,11 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL,
-  role TEXT DEFAULT 'user',
+  role TEXT DEFAULT 'user', -- 'admin', 'tutor', 'user'
   balance DECIMAL(10, 2) DEFAULT 0,
   status TEXT DEFAULT 'active',
   photo_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- App Settings Table (Singleton Configuration)
-CREATE TABLE IF NOT EXISTS app_settings (
-  id INT PRIMARY KEY DEFAULT 1,
-  platform_name TEXT DEFAULT 'Nexlify',
-  logo_url TEXT,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
--- Initialize Default Settings
-INSERT INTO app_settings (id, platform_name) VALUES (1, 'Nexlify') ON CONFLICT (id) DO NOTHING;
-
--- Products Table
-CREATE TABLE IF NOT EXISTS products (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  category TEXT,
-  price DECIMAL(10, 2) DEFAULT 0,
-  image_url TEXT,
-  preview_url TEXT,
-  download_url TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Purchases Table (Tracks ownership of products)
-CREATE TABLE IF NOT EXISTS purchases (
-  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-  product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
-  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id, product_id)
 );
 
 -- Courses Table (Using JSONB for modules)
@@ -73,9 +42,31 @@ CREATE TABLE IF NOT EXISTS courses (
   level TEXT,
   duration TEXT,
   instructor TEXT,
+  tutor_id TEXT REFERENCES users(id), -- Linked Instructor
   price DECIMAL(10, 2) DEFAULT 0,
   modules_json JSONB,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tutor Questions Table
+CREATE TABLE IF NOT EXISTS tutor_questions (
+    id TEXT PRIMARY KEY,
+    course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id TEXT,
+    student_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    student_name TEXT,
+    question TEXT NOT NULL,
+    reply TEXT,
+    replied_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Purchases Table
+CREATE TABLE IF NOT EXISTS purchases (
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
+  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, product_id)
 );
 
 -- Enrollments Table
@@ -85,69 +76,25 @@ CREATE TABLE IF NOT EXISTS enrollments (
   enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (user_id, course_id)
 );
-
--- Transactions Table
-CREATE TABLE IF NOT EXISTS transactions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT REFERENCES users(id),
-  type TEXT, -- 'course_enrollment' or 'product_purchase'
-  item_id TEXT,
-  amount DECIMAL(10, 2),
-  reference TEXT,
-  status TEXT DEFAULT 'success',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Inquiries Table
-CREATE TABLE IF NOT EXISTS inquiries (
-  id TEXT PRIMARY KEY,
-  name TEXT,
-  email TEXT,
-  message TEXT,
-  service_type TEXT,
-  status TEXT DEFAULT 'new',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Activity Logs Table
-CREATE TABLE IF NOT EXISTS activity_logs (
-  id TEXT PRIMARY KEY,
-  user_id TEXT,
-  action TEXT,
-  description TEXT,
-  type TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
 ```
 
-### Updates for Existing Databases
-If you already have tables, run these specific commands to update your schema:
+### Required Updates for Existing Databases
+If you have already created your database, run these commands:
 
 ```sql
--- Add photo_url to users table
-ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT;
+-- Support Tutor assignment
+ALTER TABLE courses ADD COLUMN IF NOT EXISTS tutor_id TEXT REFERENCES users(id);
 
--- Create purchases table
-CREATE TABLE IF NOT EXISTS purchases (
-  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
-  product_id TEXT REFERENCES products(id) ON DELETE CASCADE,
-  purchased_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (user_id, product_id)
-);
-
--- Create transactions table
-CREATE TABLE IF NOT EXISTS transactions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT REFERENCES users(id),
-  type TEXT,
-  item_id TEXT,
-  amount DECIMAL(10, 2),
-  reference TEXT,
-  status TEXT DEFAULT 'success',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Create Questions Table
+CREATE TABLE IF NOT EXISTS tutor_questions (
+    id TEXT PRIMARY KEY,
+    course_id TEXT REFERENCES courses(id) ON DELETE CASCADE,
+    lesson_id TEXT,
+    student_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    student_name TEXT,
+    question TEXT NOT NULL,
+    reply TEXT,
+    replied_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
-
-## Local Development
-1. Create a `.env` file in the root directory with all variables listed in section 2.
-2. Run `npm run dev` or `vercel dev`.

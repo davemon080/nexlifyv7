@@ -125,7 +125,7 @@ export interface Course {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   duration: string; 
   instructor: string;
-  tutorId?: string; // Linked User ID
+  tutorId?: string; 
   price: number;
   modules: Module[];
 }
@@ -136,7 +136,6 @@ export interface TutorQuestion {
     lessonId: string;
     studentId: string;
     studentName: string;
-    studentPhoto?: string;
     question: string;
     reply?: string;
     createdAt: string;

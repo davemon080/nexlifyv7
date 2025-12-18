@@ -41,72 +41,27 @@ export const isCloudEnabled = () => true;
 // --- TUTOR SERVICES ---
 
 export const getTutorCourses = async (tutorId: string): Promise<Course[]> => {
-    try {
-        const all = await api<Course[]>('getCourses');
-        return all.filter(c => c.tutorId === tutorId);
-    } catch {
-        return getLocal<Course>('courses').filter(c => c.tutorId === tutorId);
-    }
+    return await api<Course[]>(`getTutorCourses&tutorId=${tutorId}`);
 };
 
 export const getTutorStats = async (tutorId: string) => {
-    try {
-        return await api<{totalStudents: number, totalEarnings: number}>(`getTutorStats&tutorId=${tutorId}`);
-    } catch {
-        const users = getLocal<User>('users');
-        const courses = getLocal<Course>('courses').filter(c => c.tutorId === tutorId);
-        let studentCount = 0;
-        let earnings = 0;
-        courses.forEach(c => {
-            const courseStudents = users.filter(u => u.enrolledCourses?.includes(c.id)).length;
-            studentCount += courseStudents;
-            earnings += (courseStudents * c.price * 0.1);
-        });
-        return { totalStudents: studentCount, totalEarnings: earnings };
-    }
+    return await api<{totalStudents: number, totalEarnings: number}>(`getTutorStats&tutorId=${tutorId}`);
 };
 
 export const postStudentQuestion = async (q: Omit<TutorQuestion, 'id' | 'createdAt'>): Promise<void> => {
-    const id = `tq-${Date.now()}`;
-    try {
-        await api('postQuestion', 'POST', { ...q, id });
-    } catch {
-        const local = getLocal<TutorQuestion>('tutor_questions');
-        local.unshift({ ...q, id, createdAt: new Date().toISOString() });
-        setLocal('tutor_questions', local);
-    }
+    await api('postQuestion', 'POST', q);
 };
 
-export const replyToQuestion = async (questionId: string, reply: string): Promise<void> => {
-    try {
-        await api('replyToQuestion', 'POST', { id: questionId, reply });
-    } catch {
-        const local = getLocal<TutorQuestion>('tutor_questions');
-        const idx = local.findIndex(q => q.id === questionId);
-        if (idx !== -1) {
-            local[idx].reply = reply;
-            local[idx].repliedAt = new Date().toISOString();
-            setLocal('tutor_questions', local);
-            
-            // Notify student
-            await sendNotification({
-                userId: local[idx].studentId,
-                title: 'Tutor Replied!',
-                message: 'Your instructor has responded to your question in the classroom.',
-                type: 'success'
-            });
-        }
-    }
+export const replyToQuestion = async (id: string, reply: string): Promise<void> => {
+    await api('replyToQuestion', 'POST', { id, reply });
 };
 
-export const getQuestionsByCourse = async (courseId: string): Promise<TutorQuestion[]> => {
-    try { return await api<TutorQuestion[]>(`getQuestions&courseId=${courseId}`); }
-    catch { return getLocal<TutorQuestion>('tutor_questions').filter(q => q.courseId === courseId); }
+export const getQuestionsByLesson = async (lessonId: string): Promise<TutorQuestion[]> => {
+    return await api<TutorQuestion[]>(`getQuestionsByLesson&lessonId=${lessonId}`);
 };
 
-export const getQuestionsByStudent = async (studentId: string): Promise<TutorQuestion[]> => {
-    try { return await api<TutorQuestion[]>(`getQuestions&studentId=${studentId}`); }
-    catch { return getLocal<TutorQuestion>('tutor_questions').filter(q => q.studentId === studentId); }
+export const getQuestionsByTutor = async (tutorId: string): Promise<TutorQuestion[]> => {
+    return await api<TutorQuestion[]>(`getQuestionsByTutor&tutorId=${tutorId}`);
 };
 
 // --- NOTIFICATION SERVICES ---

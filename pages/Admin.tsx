@@ -19,7 +19,7 @@ import {
   Wallet, Search, MoreVertical, X, Check, 
   Upload, FileText, Download, Edit, Video, 
   GripVertical, Settings, Save, Globe, Eye, BookOpen, Bell, Send, HelpCircle, ChevronDown, ChevronUp, Link as LinkIcon, DownloadCloud,
-  Sparkles, Image as ImageIcon, DollarSign, Tag, Info, MessageSquare, Mail, Calendar, ExternalLink, UserPlus
+  Sparkles, Image as ImageIcon, DollarSign, Tag, Info, MessageSquare, Mail, Calendar, ExternalLink, UserCheck
 } from 'lucide-react';
 
 export const Admin: React.FC = () => {
@@ -70,24 +70,31 @@ export const Admin: React.FC = () => {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
+  const handleAssignTutor = async (courseId: string, tutorId: string) => {
+    const course = courses.find(c => c.id === courseId);
+    const tutor = users.find(u => u.id === tutorId);
+    if (!course || !tutor) return;
+
+    try {
+      const updatedCourse = { ...course, tutorId: tutor.id, instructor: tutor.name };
+      const updatedUser = { ...tutor, role: 'tutor' as any };
+      
+      await updateCourse(updatedCourse);
+      await updateUser(updatedUser);
+      
+      showToast(`${tutor.name} assigned to ${course.title}`, 'success');
+      loadData();
+    } catch (e) {
+      showToast("Failed to assign tutor", 'error');
+    }
+  };
+
   const handleUpdateUserStatus = async (user: User, status: any) => {
       const updated = { ...user, status };
       await updateUser(updated);
       setUsers(users.map(u => u.id === user.id ? updated : u));
       setSelectedUser(updated);
       showToast(`User ${status} successful!`, 'success');
-  };
-
-  const handleAssignTutor = async (course: Course, tutorId: string) => {
-      const tutor = users.find(u => u.id === tutorId);
-      if (!tutor) return;
-      
-      const updatedCourse = { ...course, tutorId, instructor: tutor.name };
-      const updatedTutor = { ...tutor, role: 'tutor' as any };
-      
-      await Promise.all([updateCourse(updatedCourse), updateUser(updatedTutor)]);
-      showToast(`${tutor.name} assigned as instructor.`, 'success');
-      loadData();
   };
 
   const handleGrantAccess = async (courseId: string) => {
@@ -174,51 +181,78 @@ export const Admin: React.FC = () => {
       </div>
 
       {activeTab === 'training' && (
-          <div className="space-y-6">
-              <div className="flex justify-between items-center bg-[#1E1F20] p-6 rounded-3xl border border-[#444746]">
-                  <div>
-                    <h3 className="text-xl font-bold text-[#E3E3E3]">Academy Programs</h3>
-                    <p className="text-sm text-[#8E918F]">Curriculum & Instructor management.</p>
+        <div className="space-y-6">
+            <div className="flex justify-between items-center bg-[#1E1F20] p-6 rounded-3xl border border-[#444746]">
+                <div>
+                  <h3 className="text-xl font-bold text-[#E3E3E3]">Academy Courses</h3>
+                  <p className="text-sm text-[#8E918F]">Assign instructors and build curriculums.</p>
+                </div>
+                <Button icon={Plus} onClick={() => { setIsEditingCourse(false); setCurrentCourse({ title: '', modules: [], price: 0 }); setShowCourseModal(true); }}>Create Course</Button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {courses.map(c => (
+                    <Card key={c.id} className="p-6 border-[#444746] flex flex-col h-full">
+                        <div className="flex gap-4 mb-6">
+                            <img src={c.thumbnail} className="w-24 h-24 rounded-2xl object-cover bg-[#131314]" alt={c.title} />
+                            <div className="flex-1">
+                                <h4 className="font-bold text-[#E3E3E3] text-lg mb-1">{c.title}</h4>
+                                <Badge color="blue" className="text-[10px] uppercase font-bold mb-2">{c.level}</Badge>
+                                <div className="text-sm font-bold text-[#6DD58C]">₦{c.price.toLocaleString()}</div>
+                            </div>
+                        </div>
+
+                        <div className="mb-6 p-4 bg-[#131314] rounded-2xl border border-[#444746]">
+                            <label className="block text-[10px] font-black uppercase text-[#8E918F] mb-3">Course Instructor</label>
+                            <div className="flex gap-3">
+                                <select 
+                                    className="flex-1 bg-[#1E1F20] border border-[#444746] rounded-xl px-4 py-2 text-xs text-[#E3E3E3] focus:border-[#A8C7FA] outline-none"
+                                    value={c.tutorId || ''}
+                                    onChange={(e) => handleAssignTutor(c.id, e.target.value)}
+                                >
+                                    <option value="">None Assigned</option>
+                                    {users.filter(u => u.role !== 'admin').map(u => (
+                                        <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+                                    ))}
+                                </select>
+                                <div className="p-2 bg-[#A8C7FA]/10 rounded-xl">
+                                    <UserCheck className="w-5 h-5 text-[#A8C7FA]" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-auto flex gap-2">
+                            <Button size="sm" variant="outline" className="flex-1" icon={Edit} onClick={() => { setIsEditingCourse(true); setCurrentCourse(c); setShowCourseModal(true); }}>Curriculum</Button>
+                            <button onClick={() => deleteCourse(c.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-xl transition-colors"><Trash2 className="w-5 h-5" /></button>
+                        </div>
+                    </Card>
+                ))}
+            </div>
+        </div>
+      )}
+
+      {/* Course Curriculum Builder Modal */}
+      {showCourseModal && (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl z-[200] flex items-center justify-center p-4">
+              <div className="bg-[#1E1F20] w-full max-w-7xl h-full rounded-[48px] border border-[#444746] flex flex-col overflow-hidden shadow-2xl">
+                  <div className="px-10 py-6 border-b border-[#444746] bg-[#131314] flex justify-between items-center">
+                      <div className="flex items-center gap-6">
+                          <div className="p-3 bg-[#A8C7FA]/10 rounded-2xl"><GraduationCap className="text-[#A8C7FA]" /></div>
+                          <div><h2 className="text-xl font-bold text-[#E3E3E3]">{isEditingCourse ? 'Edit Curriculum' : 'New Academy Course'}</h2></div>
+                      </div>
+                      <button onClick={() => setShowCourseModal(false)} className="p-3 hover:bg-[#1E1F20] rounded-full"><X className="w-8 h-8 text-[#5E5E5E]" /></button>
                   </div>
-                  <Button icon={Plus} onClick={() => { setIsEditingCourse(false); setCurrentCourse({ title: '', modules: [], price: 0 }); setShowCourseModal(true); }}>Create Course</Button>
-              </div>
-              <div className="grid gap-6">
-                  {courses.map(course => (
-                      <Card key={course.id} className="p-6">
-                          <div className="flex flex-col md:flex-row gap-6">
-                              <img src={course.thumbnail} className="w-full md:w-48 h-32 object-cover rounded-2xl bg-[#131314]" />
-                              <div className="flex-1">
-                                  <div className="flex justify-between items-start mb-4">
-                                      <div>
-                                          <h4 className="text-xl font-bold text-[#E3E3E3]">{course.title}</h4>
-                                          <p className="text-sm text-[#8E918F]">{course.modules.length} Modules • ₦{course.price.toLocaleString()}</p>
-                                      </div>
-                                      <div className="flex gap-2">
-                                          <Button size="sm" variant="outline" onClick={() => { setIsEditingCourse(true); setCurrentCourse(course); setShowCourseModal(true); }}>Edit</Button>
-                                          <button onClick={() => deleteCourse(course.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-lg"><Trash2 className="w-4 h-4" /></button>
-                                      </div>
-                                  </div>
-                                  <div className="flex flex-col sm:flex-row items-center gap-4 pt-4 border-t border-[#444746]">
-                                      <div className="flex-1 flex items-center gap-2">
-                                          <UserPlus className="w-4 h-4 text-[#A8C7FA]" />
-                                          <select 
-                                            className="bg-[#131314] border border-[#444746] rounded-xl px-3 py-1.5 text-xs text-[#C4C7C5] flex-1 outline-none focus:border-[#A8C7FA]"
-                                            value={course.tutorId || ''}
-                                            onChange={(e) => handleAssignTutor(course, e.target.value)}
-                                          >
-                                              <option value="">Assign Instructor...</option>
-                                              {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
-                                          </select>
-                                      </div>
-                                      <div className="flex-1 text-center sm:text-right">
-                                          <p className="text-[10px] font-black uppercase text-[#8E918F]">Current Instructor</p>
-                                          <p className="text-sm font-bold text-[#A8C7FA]">{course.instructor || 'Unassigned'}</p>
-                                      </div>
-                                  </div>
-                              </div>
+                  <div className="flex-1 overflow-y-auto p-10 no-scrollbar">
+                      <div className="max-w-3xl mx-auto space-y-6">
+                          <Input label="Course Title" value={currentCourse.title} onChange={e => setCurrentCourse({...currentCourse, title: e.target.value})} />
+                          <Textarea label="Description" rows={5} value={currentCourse.description} onChange={e => setCurrentCourse({...currentCourse, description: e.target.value})} />
+                          <div className="grid grid-cols-2 gap-4">
+                              <Input label="Price (₦)" type="number" value={currentCourse.price} onChange={e => setCurrentCourse({...currentCourse, price: parseFloat(e.target.value)})} />
+                              <Input label="Duration" value={currentCourse.duration} onChange={e => setCurrentCourse({...currentCourse, duration: e.target.value})} />
                           </div>
-                      </Card>
-                  ))}
+                          <Input label="Thumbnail URL" value={currentCourse.thumbnail} onChange={e => setCurrentCourse({...currentCourse, thumbnail: e.target.value})} />
+                          <Button icon={Save} className="w-full" onClick={handleSaveCourse}>Save Course</Button>
+                      </div>
+                  </div>
               </div>
           </div>
       )}
@@ -266,16 +300,6 @@ export const Admin: React.FC = () => {
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8E918F]" />
                       <input type="text" placeholder="Search by name or email..." className="w-full bg-[#1E1F20] border border-[#444746] rounded-2xl py-3.5 pl-12 pr-4 text-[#E3E3E3]" value={userSearch} onChange={e => setUserSearch(e.target.value)} />
                   </div>
-                  <Button variant="outline" icon={DownloadCloud} onClick={() => {
-                    const data = { users, timestamp: new Date().toISOString() };
-                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `nexlify_backup.json`;
-                    a.click();
-                    showToast("Database backup downloaded.", 'success');
-                  }}>Export Backup</Button>
               </div>
               <div className="bg-[#1E1F20] rounded-3xl border border-[#444746] overflow-hidden">
                   <table className="w-full text-left">
@@ -310,30 +334,58 @@ export const Admin: React.FC = () => {
           </div>
       )}
 
-      {/* Course Curriculum Builder Modal */}
-      {showCourseModal && (
-          <div className="fixed inset-0 bg-black/95 backdrop-blur-3xl z-[200] flex items-center justify-center p-4">
-              <div className="bg-[#1E1F20] w-full max-w-7xl h-full rounded-[48px] border border-[#444746] flex flex-col overflow-hidden shadow-2xl">
-                  <div className="px-10 py-6 border-b border-[#444746] bg-[#131314] flex justify-between items-center">
+      {/* User Manager Modal */}
+      {selectedUser && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
+              <Card className="max-w-4xl w-full h-[85vh] overflow-y-auto p-10 flex flex-col no-scrollbar bg-[#1E1F20]">
+                  <div className="flex justify-between items-start mb-10">
                       <div className="flex items-center gap-6">
-                          <div className="p-3 bg-[#A8C7FA]/10 rounded-2xl"><GraduationCap className="text-[#A8C7FA]" /></div>
-                          <div><h2 className="text-xl font-bold text-[#E3E3E3]">{isEditingCourse ? 'Edit Curriculum' : 'New Academy Course'}</h2></div>
-                      </div>
-                      <button onClick={() => setShowCourseModal(false)} className="p-3 hover:bg-[#1E1F20] rounded-full"><X className="w-8 h-8 text-[#5E5E5E]" /></button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-10 no-scrollbar">
-                      <div className="max-w-3xl mx-auto space-y-6">
-                          <Input label="Course Title" value={currentCourse.title} onChange={e => setCurrentCourse({...currentCourse, title: e.target.value})} />
-                          <Textarea label="Description" rows={5} value={currentCourse.description} onChange={e => setCurrentCourse({...currentCourse, description: e.target.value})} />
-                          <div className="grid grid-cols-2 gap-4">
-                              <Input label="Price (₦)" type="number" value={currentCourse.price} onChange={e => setCurrentCourse({...currentCourse, price: parseFloat(e.target.value)})} />
-                              <Input label="Duration" value={currentCourse.duration} onChange={e => setCurrentCourse({...currentCourse, duration: e.target.value})} />
+                          <div className="w-20 h-20 rounded-full bg-[#A8C7FA] flex items-center justify-center text-3xl font-bold text-[#062E6F]">{selectedUser.name.charAt(0)}</div>
+                          <div>
+                              <h2 className="text-3xl font-bold text-[#E3E3E3]">{selectedUser.name}</h2>
+                              <p className="text-[#8E918F]">{selectedUser.email}</p>
                           </div>
-                          <Input label="Thumbnail URL" value={currentCourse.thumbnail} onChange={e => setCurrentCourse({...currentCourse, thumbnail: e.target.value})} />
-                          <Button icon={Save} className="w-full" onClick={handleSaveCourse}>Save Course</Button>
+                      </div>
+                      <button onClick={() => setSelectedUser(null)} className="p-3 hover:bg-[#1E1F20] rounded-full transition-colors"><X className="w-8 h-8 text-[#5E5E5E]" /></button>
+                  </div>
+                  
+                  <div className="grid md:grid-cols-3 gap-8 flex-1">
+                      <div className="md:col-span-2 space-y-8">
+                          <div className="bg-[#131314] p-8 rounded-3xl border border-[#444746]">
+                              <h4 className="text-xs font-black text-[#8E918F] uppercase mb-6 flex items-center gap-2"><BookOpen className="w-4 h-4" /> Curriculum Access</h4>
+                              <div className="flex gap-4 mb-6">
+                                  <select className="flex-1 bg-[#1E1F20] border border-[#444746] rounded-2xl p-3 text-sm text-[#E3E3E3]" value={courseGrantSearch} onChange={e => setCourseGrantSearch(e.target.value)}>
+                                      <option value="">Choose Course to Grant...</option>
+                                      {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                                  </select>
+                                  <Button onClick={() => handleGrantAccess(courseGrantSearch)} disabled={!courseGrantSearch}>Grant</Button>
+                              </div>
+                              <div className="space-y-3">
+                                  {(selectedUser.enrolledCourses || []).map(cid => (
+                                      <div key={cid} className="p-4 bg-[#1E1F20] rounded-2xl flex justify-between items-center">
+                                          <span className="text-sm font-bold text-[#E3E3E3]">{courses.find(c => c.id === cid)?.title || cid}</span>
+                                          <button onClick={() => handleRevokeAccess(cid)} className="text-[10px] text-[#CF6679] font-black uppercase hover:underline">Revoke Access</button>
+                                      </div>
+                                  ))}
+                              </div>
+                          </div>
+                      </div>
+                      <div className="space-y-6">
+                          <div className="bg-[#131314] p-8 rounded-3xl border border-[#444746]">
+                              <p className="text-[10px] font-black text-[#8E918F] uppercase mb-2">Wallet Balance</p>
+                              <p className="text-3xl font-bold text-[#6DD58C] mb-6">₦{selectedUser.balance.toLocaleString()}</p>
+                              <div className="grid grid-cols-2 gap-3">
+                                  <Button size="sm" variant="outline" onClick={() => handleAdjustBalance(1)}>+ Topup</Button>
+                                  <Button size="sm" variant="outline" onClick={() => handleAdjustBalance(-1)}>- Deduct</Button>
+                              </div>
+                          </div>
+                          <div className="bg-[#131314] p-8 rounded-3xl border border-[#444746] space-y-4">
+                              <p className="text-[10px] font-black text-[#8E918F] uppercase mb-4">Account Control</p>
+                              <Button variant={selectedUser.status === 'active' ? 'danger' : 'primary'} className="w-full" onClick={() => handleUpdateUserStatus(selectedUser, selectedUser.status === 'active' ? 'suspended' : 'active')}>{selectedUser.status === 'active' ? 'Suspend Account' : 'Reactivate Account'}</Button>
+                          </div>
                       </div>
                   </div>
-              </div>
+              </Card>
           </div>
       )}
     </div>
