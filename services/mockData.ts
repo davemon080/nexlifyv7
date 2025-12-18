@@ -1,5 +1,5 @@
 
-import { Product, Inquiry, Service, EarningMethod, Course, User, ActivityLog, Module, Lesson, AppSettings, Notification } from '../types';
+import { Product, Inquiry, Service, EarningMethod, Course, User, ActivityLog, Module, Lesson, AppSettings, Notification, TutorQuestion } from '../types';
 
 const API_URL = '/api';
 
@@ -38,6 +38,77 @@ const setLocal = (key: string, data: any[]) => {
 
 export const isCloudEnabled = () => true;
 
+// --- TUTOR SERVICES ---
+
+export const getTutorCourses = async (tutorId: string): Promise<Course[]> => {
+    try {
+        const all = await api<Course[]>('getCourses');
+        return all.filter(c => c.tutorId === tutorId);
+    } catch {
+        return getLocal<Course>('courses').filter(c => c.tutorId === tutorId);
+    }
+};
+
+export const getTutorStats = async (tutorId: string) => {
+    try {
+        return await api<{totalStudents: number, totalEarnings: number}>(`getTutorStats&tutorId=${tutorId}`);
+    } catch {
+        const users = getLocal<User>('users');
+        const courses = getLocal<Course>('courses').filter(c => c.tutorId === tutorId);
+        let studentCount = 0;
+        let earnings = 0;
+        courses.forEach(c => {
+            const courseStudents = users.filter(u => u.enrolledCourses?.includes(c.id)).length;
+            studentCount += courseStudents;
+            earnings += (courseStudents * c.price * 0.1);
+        });
+        return { totalStudents: studentCount, totalEarnings: earnings };
+    }
+};
+
+export const postStudentQuestion = async (q: Omit<TutorQuestion, 'id' | 'createdAt'>): Promise<void> => {
+    const id = `tq-${Date.now()}`;
+    try {
+        await api('postQuestion', 'POST', { ...q, id });
+    } catch {
+        const local = getLocal<TutorQuestion>('tutor_questions');
+        local.unshift({ ...q, id, createdAt: new Date().toISOString() });
+        setLocal('tutor_questions', local);
+    }
+};
+
+export const replyToQuestion = async (questionId: string, reply: string): Promise<void> => {
+    try {
+        await api('replyToQuestion', 'POST', { id: questionId, reply });
+    } catch {
+        const local = getLocal<TutorQuestion>('tutor_questions');
+        const idx = local.findIndex(q => q.id === questionId);
+        if (idx !== -1) {
+            local[idx].reply = reply;
+            local[idx].repliedAt = new Date().toISOString();
+            setLocal('tutor_questions', local);
+            
+            // Notify student
+            await sendNotification({
+                userId: local[idx].studentId,
+                title: 'Tutor Replied!',
+                message: 'Your instructor has responded to your question in the classroom.',
+                type: 'success'
+            });
+        }
+    }
+};
+
+export const getQuestionsByCourse = async (courseId: string): Promise<TutorQuestion[]> => {
+    try { return await api<TutorQuestion[]>(`getQuestions&courseId=${courseId}`); }
+    catch { return getLocal<TutorQuestion>('tutor_questions').filter(q => q.courseId === courseId); }
+};
+
+export const getQuestionsByStudent = async (studentId: string): Promise<TutorQuestion[]> => {
+    try { return await api<TutorQuestion[]>(`getQuestions&studentId=${studentId}`); }
+    catch { return getLocal<TutorQuestion>('tutor_questions').filter(q => q.studentId === studentId); }
+};
+
 // --- NOTIFICATION SERVICES ---
 
 export const getNotifications = async (userId: string): Promise<Notification[]> => {
@@ -48,7 +119,6 @@ export const getNotifications = async (userId: string): Promise<Notification[]> 
     }
 };
 
-// Fix: Omit 'id' from the notification payload as it is generated internally
 export const sendNotification = async (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'> & { isBroadcast?: boolean }): Promise<void> => {
     const id = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
     try {
@@ -87,7 +157,6 @@ export const getHostedFiles = async (): Promise<HostedFile[]> => {
     try { return await api<HostedFile[]>('getHostedFiles'); } catch { return getLocal<HostedFile>('hosted_files'); }
 };
 
-// Fix: Use consistent property names for HostedFile (mime_type instead of mimeType)
 export const uploadHostedFile = async (name: string, mimeType: string, content: string): Promise<HostedFile> => {
     const id = `file-${Date.now()}-${Math.random().toString(36).substr(2,5)}`;
     const newFile: HostedFile = { id, name, mime_type: mimeType, content, created_at: new Date().toISOString() };
@@ -174,9 +243,9 @@ export const registerUser = async (name: string, email: string, password: string
     } catch (e: any) {
         const users = getLocal<User>('users');
         if (users.find(u => u.email === email)) throw new Error('Email already exists (Local Mode)');
-        const finalRole = role === 'admin' ? 'admin' : 'user';
+        const finalRole = (role === 'admin' || role === 'tutor') ? role : 'user';
         const newUser: User = { 
-            id, name, email, password, role: finalRole, 
+            id, name, email, password, role: finalRole as any, 
             balance: 0, joinedAt: new Date().toISOString(), status: 'active', enrolledCourses: [], purchasedProducts: [] 
         };
         users.push(newUser);
@@ -434,5 +503,5 @@ export const SERVICES_LIST: Service[] = [
 export const EARNING_METHODS: EarningMethod[] = [
   { id: 'e1', title: 'Referral Program', description: 'Invite friends and earn commissions.', potential: '₦5,000 - ₦50,000 per user' },
   { id: 'e2', title: 'Freelance Marketplace', description: 'List your skills and get hired.', potential: '₦20,000 - ₦100,000 per hour' },
-  { id: 'e3', title: 'Micro-Tasks', description: 'Complete simple digital tasks.', potential: '₦5,000 - ₦20,000 per day' }
+  { id: 'e3', title: 'Micro-Tasks', description: 'Complete simple digital tasks.', potential: '₦5,000 - 20,000 per day' }
 ];

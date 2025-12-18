@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, createContext, useContext } from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
@@ -6,6 +7,7 @@ import { Marketplace } from './pages/Marketplace';
 import { Hire } from './pages/Hire';
 import { Earn } from './pages/Earn';
 import { Admin } from './pages/Admin';
+import { TutorDashboard } from './pages/TutorDashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Training } from './pages/Training';
@@ -104,6 +106,7 @@ const App: React.FC = () => {
                 <Route path="/training/:id" element={<CourseDetail />} />
                 <Route path="/classroom/:id" element={<Classroom />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/tutor-dashboard" element={<TutorDashboard />} />
                 <Route path="/admin/hosting" element={<FileHosting />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

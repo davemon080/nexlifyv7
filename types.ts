@@ -58,7 +58,7 @@ export interface User {
   id: string;
   email: string;
   password?: string; 
-  role: 'admin' | 'user';
+  role: 'admin' | 'tutor' | 'user';
   name: string;
   balance: number;
   joinedAt: string;
@@ -125,8 +125,22 @@ export interface Course {
   level: 'Beginner' | 'Intermediate' | 'Advanced';
   duration: string; 
   instructor: string;
+  tutorId?: string; // Linked User ID
   price: number;
   modules: Module[];
+}
+
+export interface TutorQuestion {
+    id: string;
+    courseId: string;
+    lessonId: string;
+    studentId: string;
+    studentName: string;
+    studentPhoto?: string;
+    question: string;
+    reply?: string;
+    createdAt: string;
+    repliedAt?: string;
 }
 
 export interface Enrollment {
