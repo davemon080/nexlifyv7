@@ -20,7 +20,7 @@ async function api<T>(action: string, method = 'GET', body?: any): Promise<T> {
       }
       return res.json();
   } catch (error: any) {
-      console.warn(`API call '${action}' failed:`, error.message);
+      console.error(`[Nexlify API] Action '${action}' failed:`, error.message);
       throw error;
   }
 }
@@ -128,21 +128,11 @@ export const updateAppSettings = async (settings: AppSettings) => {
 
 export const registerUser = async (name: string, email: string, password: string, role: string = 'user', adminSecret?: string): Promise<User> => {
     const id = `u-${Date.now()}`;
-    try {
-        const user = await api<User>('register', 'POST', { id, name, email, password, role, adminSecret });
-        return user;
-    } catch (e: any) {
-        throw e;
-    }
+    return await api<User>('register', 'POST', { id, name, email, password, role, adminSecret });
 };
 
 export const loginUser = async (email: string, password: string): Promise<User> => {
-    try {
-        const user = await api<User>('login', 'POST', { email, password });
-        return user;
-    } catch (e) {
-        throw e;
-    }
+    return await api<User>('login', 'POST', { email, password });
 };
 
 export const getAllUsers = async (): Promise<User[]> => {
@@ -155,10 +145,9 @@ export const updateUser = async (updatedUser: User): Promise<void> => {
 
 export const getCurrentUser = (): User | null => {
   const stored = localStorage.getItem('currentUser');
-  return stored ? JSON.parse(stored) : null;
+  return (stored && stored !== 'null') ? JSON.parse(stored) : null;
 };
 
-// Added googleAuthenticate to fix error in Login and Register pages
 export const googleAuthenticate = async (token: string): Promise<User> => {
     try {
         return await api<User>('googleAuth', 'POST', { token });
@@ -175,7 +164,6 @@ export const googleAuthenticate = async (token: string): Promise<User> => {
     }
 };
 
-// Added changePassword to fix error in Profile page
 export const changePassword = async (userId: string, current: string, next: string): Promise<void> => {
     await api('changePassword', 'POST', { userId, current, next });
 };
@@ -277,27 +265,22 @@ export const saveCompletedLesson = (courseId: string, lessonId: string) => {
     }
 }
 
-// Added logUserActivity to fix error in Marketplace page
 export const logUserActivity = async (userId: string, action: string, description: string, type: 'info' | 'warning' | 'success' | 'danger') => {
     try { await api('logActivity', 'POST', { userId, action, description, type }); } catch {}
 };
 
-// Added recordTransaction to fix error in Marketplace and CourseDetail pages
 export const recordTransaction = async (userId: string, type: string, targetId: string, amount: number, reference: string) => {
     try { await api('recordTransaction', 'POST', { userId, type, targetId, amount, reference }); } catch {}
 };
 
-// Added deleteUser to fix error in Admin page
 export const deleteUser = async (id: string): Promise<void> => {
     try { await api('deleteUser', 'POST', { id }); } catch {}
 };
 
-// Added getUserActivity to fix error in Admin page
 export const getUserActivity = async (userId: string): Promise<ActivityLog[]> => {
     try { return await api<ActivityLog[]>(`getLogs&userId=${userId}`); } catch { return []; }
 };
 
-// Added initializeDatabase to fix error in App component
 export const initializeDatabase = () => {
     if (!localStorage.getItem('appSettings')) {
         localStorage.setItem('appSettings', JSON.stringify({ platformName: 'Nexlify' }));
@@ -318,12 +301,10 @@ export const getInquiries = async (): Promise<Inquiry[]> => {
     try { return await api<Inquiry[]>('getInquiries'); } catch { return []; }
 };
 
-// Added getHostedFiles to fix error in FileHosting page
 export const getHostedFiles = async (): Promise<HostedFile[]> => {
     try { return await api<HostedFile[]>('getHostedFiles'); } catch { return getLocal<HostedFile>('hosted_files'); }
 };
 
-// Added uploadHostedFile to fix error in Admin and FileHosting pages
 export const uploadHostedFile = async (name: string, mime_type: string, content: string): Promise<void> => {
     const id = `file-${Date.now()}`;
     try { await api('uploadHostedFile', 'POST', { id, name, mime_type, content }); } catch {
@@ -333,7 +314,6 @@ export const uploadHostedFile = async (name: string, mime_type: string, content:
     }
 };
 
-// Added deleteHostedFile to fix error in FileHosting page
 export const deleteHostedFile = async (id: string): Promise<void> => {
     try { await api('deleteHostedFile', 'POST', { id }); } catch {
         const files = getLocal<HostedFile>('hosted_files');
@@ -341,7 +321,6 @@ export const deleteHostedFile = async (id: string): Promise<void> => {
     }
 };
 
-// Added getFileContent to fix error in TemplateViewer page
 export const getFileContent = async (id: string): Promise<HostedFile | null> => {
     try { return await api<HostedFile>(`getFileContent&id=${id}`); } catch {
         return getLocal<HostedFile>('hosted_files').find(f => f.id === id) || null;

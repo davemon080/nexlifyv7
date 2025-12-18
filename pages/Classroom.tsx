@@ -36,6 +36,8 @@ export const Classroom: React.FC = () => {
   const [completedIds, setCompletedIds] = useState<string[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [activeTab, setActiveTab] = useState<'content' | 'support'>('content');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [quizAnswers, setQuizAnswers] = useState<{[key: string]: number}>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
@@ -46,52 +48,67 @@ export const Classroom: React.FC = () => {
   const [isPosting, setIsPosting] = useState(false);
 
   useEffect(() => {
-    const isEnrolled = localStorage.getItem(`enrolled_${id}`) === 'true';
-    const user = localStorage.getItem('currentUser');
-    const uRole = user ? JSON.parse(user).role : null;
-    if (!isEnrolled && !(user && JSON.parse(user).enrolledCourses?.includes(id)) && uRole !== 'admin' && uRole !== 'tutor') {
+    if (!id) return;
+    const userStr = localStorage.getItem('currentUser');
+    const user = userStr ? JSON.parse(userStr) : null;
+    const isEnrolledLocally = localStorage.getItem(`enrolled_${id}`) === 'true';
+    const uRole = user ? user.role : null;
+    const isEnrolledOnAccount = user?.enrolledCourses?.includes(id);
+
+    if (!isEnrolledLocally && !isEnrolledOnAccount && uRole !== 'admin' && uRole !== 'tutor') {
       navigate(`/training/${id}`);
       return;
     }
 
     const load = async () => {
-      if (id) {
-        try {
-            const c = await getCourseById(id);
-            if (c && c.modules.length > 0) {
+      setIsLoading(true);
+      try {
+          const c = await getCourseById(id);
+          if (c) {
               setCourse(c);
               const completed = getCompletedLessons(id);
               setCompletedIds(completed);
-              let found = false;
-              for(const m of c.modules) {
-                  for(const l of m.lessons) {
-                      if(!completed.includes(l.id)) {
-                          setActiveModule(m);
-                          setActiveLesson(l);
-                          found = true;
-                          break;
+
+              if (c.modules && c.modules.length > 0) {
+                  let found = false;
+                  for(const m of c.modules) {
+                      for(const l of m.lessons) {
+                          if(!completed.includes(l.id)) {
+                              setActiveModule(m);
+                              setActiveLesson(l);
+                              found = true;
+                              break;
+                          }
                       }
+                      if(found) break;
                   }
-                  if(found) break;
+                  if(!found && c.modules[0].lessons.length > 0) {
+                    setActiveModule(c.modules[0]);
+                    setActiveLesson(c.modules[0].lessons[0]);
+                  }
               }
-              if(!found) {
-                setActiveModule(c.modules[0]);
-                setActiveLesson(c.modules[0].lessons[0]);
-              }
-            }
-        } catch (e) { console.error(e); }
+          } else {
+              setError("Course content not found or available.");
+          }
+      } catch (e) { 
+          setError("Failed to load course environment.");
+          console.error(e); 
+      } finally {
+          setIsLoading(false);
       }
     };
     load();
   }, [id, navigate]);
 
   useEffect(() => { 
-      setQuizAnswers({}); 
-      setQuizSubmitted(false); 
-      setQuizScore(0); 
-      loadLessonQuestions();
-      const contentArea = document.getElementById('classroom-content');
-      if (contentArea) contentArea.scrollTo(0, 0);
+      if (activeLesson) {
+          setQuizAnswers({}); 
+          setQuizSubmitted(false); 
+          setQuizScore(0); 
+          loadLessonQuestions();
+          const contentArea = document.getElementById('classroom-content');
+          if (contentArea) contentArea.scrollTo(0, 0);
+      }
   }, [activeLesson]);
 
   const loadLessonQuestions = async () => {
@@ -143,7 +160,9 @@ export const Classroom: React.FC = () => {
       }
   };
 
-  if (!course || !activeModule || !activeLesson) return <div className="h-screen bg-[#131314] flex items-center justify-center text-[#A8C7FA]"><Loader2 className="animate-spin w-10 h-10" /></div>;
+  if (isLoading) return <div className="h-screen bg-[#131314] flex items-center justify-center text-[#A8C7FA]"><Loader2 className="animate-spin w-10 h-10" /></div>;
+  if (error) return <div className="h-screen bg-[#131314] flex flex-col items-center justify-center text-[#E3E3E3] p-6 text-center"><Badge color="red" className="mb-4">Error</Badge><h1 className="text-xl font-bold">{error}</h1><Button className="mt-6" onClick={() => navigate('/training')}>Back to Academy</Button></div>;
+  if (!course || !activeLesson) return <div className="h-screen bg-[#131314] flex flex-col items-center justify-center text-[#E3E3E3] p-6 text-center"><Badge color="yellow" className="mb-4">Empty</Badge><h1 className="text-xl font-bold">This course has no lessons yet.</h1><Button className="mt-6" onClick={() => navigate('/training')}>Back to Academy</Button></div>;
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden relative bg-[#0E0E0E] flex-col lg:flex-row">
@@ -157,11 +176,11 @@ export const Classroom: React.FC = () => {
         <div className="overflow-y-auto h-[calc(100%-74px)] custom-scrollbar pb-20">
             {course.modules.map((m, mIdx) => (
                 <div key={m.id} className="border-b border-[#444746]/30">
-                    <div className={`p-5 cursor-pointer flex justify-between items-center transition-colors ${activeModule.id === m.id ? 'bg-[#A8C7FA]/5 text-[#A8C7FA]' : 'text-[#8E918F] hover:bg-[#131314]'}`} onClick={() => setActiveModule(m)}>
+                    <div className={`p-5 cursor-pointer flex justify-between items-center transition-colors ${activeModule?.id === m.id ? 'bg-[#A8C7FA]/5 text-[#A8C7FA]' : 'text-[#8E918F] hover:bg-[#131314]'}`} onClick={() => setActiveModule(m)}>
                         <div className="flex flex-col gap-1"><span className="text-[9px] font-black uppercase opacity-60">Module {mIdx + 1}</span><span className="text-xs font-bold">{m.title}</span></div>
-                        {activeModule.id === m.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4 opacity-30" />}
+                        {activeModule?.id === m.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4 opacity-30" />}
                     </div>
-                    {activeModule.id === m.id && (
+                    {activeModule?.id === m.id && (
                         <div className="bg-[#131314]/80">
                             {m.lessons.map((l, lIdx) => (
                                 <div key={l.id} className={`pl-10 pr-6 py-4 cursor-pointer flex items-center gap-4 text-xs transition-all border-l-2 ${activeLesson.id === l.id ? 'text-[#A8C7FA] bg-[#A8C7FA]/10 border-[#A8C7FA]' : 'text-[#8E918F] border-transparent hover:text-[#C4C7C5]'}`} onClick={() => { setActiveLesson(l); if (window.innerWidth < 1024) setSidebarOpen(false); }}>
@@ -181,7 +200,7 @@ export const Classroom: React.FC = () => {
             <div className="flex items-center gap-3 min-w-0">
                 <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-[#C4C7C5] lg:hidden"><Menu className="w-6 h-6" /></button>
                 <div className="truncate">
-                    <p className="text-[9px] text-[#A8C7FA] uppercase font-black tracking-widest truncate">{activeModule.title}</p>
+                    <p className="text-[9px] text-[#A8C7FA] uppercase font-black tracking-widest truncate">{activeModule?.title}</p>
                     <h3 className="text-sm font-bold text-[#E3E3E3] truncate">{activeLesson.title}</h3>
                 </div>
             </div>
@@ -198,7 +217,7 @@ export const Classroom: React.FC = () => {
                 {activeTab === 'content' ? (
                     <>
                         {activeLesson.type === 'video' ? (
-                            <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-[#444746]"><iframe width="100%" height="100%" src={getYouTubeEmbedUrl(activeLesson.content)} frameBorder="0" allowFullScreen></iframe></div>
+                            <div className="aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-[#444746]"><iframe width="100%" height="100%" src={getYouTubeEmbedUrl(activeLesson.content)} frameBorder="0" allowFullScreen title={activeLesson.title}></iframe></div>
                         ) : (
                             <Card className="p-8 md:p-12 border-[#444746] rounded-3xl bg-[#1E1F20]/50"><h2 className="text-2xl md:text-4xl font-black text-[#E3E3E3] uppercase mb-8">{activeLesson.title}</h2><div className="prose prose-invert max-w-none text-[#C4C7C5] leading-loose text-sm md:text-lg whitespace-pre-wrap">{activeLesson.content}</div></Card>
                         )}
@@ -209,7 +228,7 @@ export const Classroom: React.FC = () => {
                         <Card className="p-6 bg-[#131314] border-[#444746]"><Textarea placeholder="Describe your question..." value={studentQuestion} onChange={(e: any) => setStudentQuestion(e.target.value)} rows={4} className="mb-4" /><div className="flex justify-end"><Button size="sm" icon={Send} onClick={handlePostQuestion} isLoading={isPosting}>Send Question</Button></div></Card>
                         <div className="space-y-4">
                             <h3 className="text-[10px] font-black uppercase tracking-widest text-[#A8C7FA]">Previous Inquiries</h3>
-                            {lessonQuestions.map((q) => (
+                            {lessonQuestions.length === 0 ? <p className="text-center py-10 text-[#5E5E5E] text-xs italic">No questions yet for this lesson.</p> : lessonQuestions.map((q) => (
                                 <Card key={q.id} className="p-5 border-[#444746]">
                                     <div className="flex items-start gap-3 mb-4"><div className="w-8 h-8 rounded-full bg-[#1E1F20] flex items-center justify-center shrink-0 border border-[#444746]"><User className="w-4 h-4 text-[#8E918F]" /></div><div className="flex-1 min-w-0"><div className="flex justify-between items-center"><span className="font-bold text-sm text-[#E3E3E3]">{q.studentName}</span><span className="text-[9px] text-[#5E5E5E] font-bold">{new Date(q.createdAt).toLocaleDateString()}</span></div><p className="text-xs text-[#C4C7C5] leading-relaxed italic">"{q.question}"</p></div></div>
                                     {q.reply && <div className="mt-4 pl-6 border-l-2 border-[#A8C7FA]/30 py-2"><Badge color="blue" className="text-[8px] mb-2">Instructor Response</Badge><p className="text-xs text-[#A8C7FA] font-medium leading-relaxed">{q.reply}</p></div>}
