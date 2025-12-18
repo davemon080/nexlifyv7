@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -18,7 +17,7 @@ import {
   Wallet, Search, MoreVertical, X, Check, 
   Upload, FileText, Download, Edit, Video, 
   GripVertical, Settings, Save, Globe, Eye, BookOpen, Bell, Send, HelpCircle, ChevronDown, ChevronUp, Link as LinkIcon, DownloadCloud,
-  Sparkles
+  Sparkles, Image as ImageIcon, DollarSign, Tag, Info
 } from 'lucide-react';
 
 export const Admin: React.FC = () => {
@@ -40,7 +39,15 @@ export const Admin: React.FC = () => {
   // Product Modal
   const [showProductModal, setShowProductModal] = useState(false);
   const [isEditingProduct, setIsEditingProduct] = useState(false);
-  const [currentProduct, setCurrentProduct] = useState<Partial<Product>>({ title: '', description: '', price: 0, category: ProductCategory.TEMPLATE });
+  const [currentProduct, setCurrentProduct] = useState<Partial<Product>>({ 
+    title: '', 
+    description: '', 
+    price: 0, 
+    category: ProductCategory.TEMPLATE,
+    imageUrl: '',
+    previewUrl: '',
+    downloadUrl: ''
+  });
 
   // Course Editor
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -122,7 +129,7 @@ export const Admin: React.FC = () => {
       e.preventDefault();
       setLoading(true);
       if (isEditingProduct) await updateProduct(currentProduct as Product);
-      else await addProduct({ ...currentProduct as Product, id: `p-${Date.now()}`, createdAt: new Date().toISOString() });
+      else await addProduct({ ...currentProduct as Product, id: `p-${Date.now()}`, createdAt: new Date().toISOString() } as Product);
       setShowProductModal(false);
       await loadData();
   };
@@ -213,16 +220,26 @@ export const Admin: React.FC = () => {
       {/* --- PRODUCTS TAB --- */}
       {activeTab === 'products' && (
         <div className="space-y-6">
-            <div className="flex justify-end"><Button icon={Plus} onClick={() => { setIsEditingProduct(false); setCurrentProduct({ title: '', price: 0, category: ProductCategory.TEMPLATE }); setShowProductModal(true); }}>Add Product</Button></div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex justify-between items-center bg-[#1E1F20] p-6 rounded-3xl border border-[#444746]">
+                <div>
+                  <h3 className="text-xl font-bold text-[#E3E3E3]">Digital Marketplace</h3>
+                  <p className="text-sm text-[#8E918F]">Manage assets, templates, and ebooks.</p>
+                </div>
+                <Button icon={Plus} onClick={() => { setIsEditingProduct(false); setCurrentProduct({ title: '', price: 0, category: ProductCategory.TEMPLATE, description: '', imageUrl: '', previewUrl: '', downloadUrl: '' }); setShowProductModal(true); }}>Add Product</Button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 {products.map(p => (
-                    <Card key={p.id} className="p-4 group">
-                        <img src={p.imageUrl} className="w-full h-32 object-cover rounded-xl mb-4" />
-                        <h4 className="font-bold text-[#E3E3E3] truncate">{p.title}</h4>
-                        <p className="text-xs text-[#8E918F] mb-4">₦{p.price.toLocaleString()}</p>
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button size="sm" variant="outline" className="flex-1" onClick={() => { setIsEditingProduct(true); setCurrentProduct(p); setShowProductModal(true); }}>Edit</Button>
-                            <button onClick={() => deleteProduct(p.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                    <Card key={p.id} className="p-4 group relative flex flex-col h-full hover:border-[#A8C7FA]/50 transition-all duration-300">
+                        <img src={p.imageUrl || 'https://images.unsplash.com/photo-1558655146-d09347e92766?w=400&h=300&fit=crop'} className="w-full h-40 object-cover rounded-xl mb-4 bg-[#131314]" />
+                        <div className="flex justify-between items-start mb-2">
+                           <Badge color="blue" className="text-[10px] uppercase font-bold">{p.category}</Badge>
+                           <p className="text-sm font-bold text-[#6DD58C]">₦{p.price.toLocaleString()}</p>
+                        </div>
+                        <h4 className="font-bold text-[#E3E3E3] truncate mb-2">{p.title}</h4>
+                        <p className="text-[10px] text-[#8E918F] line-clamp-2 mb-4 flex-grow">{p.description}</p>
+                        <div className="flex gap-2 pt-3 border-t border-[#444746]">
+                            <Button size="sm" variant="outline" className="flex-1" icon={Edit} onClick={() => { setIsEditingProduct(true); setCurrentProduct(p); setShowProductModal(true); }}>Edit</Button>
+                            <button onClick={() => deleteProduct(p.id).then(loadData)} className="p-2 text-[#CF6679] hover:bg-[#CF6679]/10 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                         </div>
                     </Card>
                 ))}
@@ -393,7 +410,7 @@ export const Admin: React.FC = () => {
                               <p className="text-[#8E918F]">{selectedUser.email}</p>
                           </div>
                       </div>
-                      <button onClick={() => setSelectedUser(null)} className="p-3 hover:bg-[#1E1F20] rounded-full"><X className="w-8 h-8 text-[#5E5E5E]" /></button>
+                      <button onClick={() => setSelectedUser(null)} className="p-3 hover:bg-[#1E1F20] rounded-full transition-colors"><X className="w-8 h-8 text-[#5E5E5E]" /></button>
                   </div>
                   
                   <div className="grid md:grid-cols-3 gap-8 flex-1">
@@ -433,6 +450,135 @@ export const Admin: React.FC = () => {
                           </div>
                       </div>
                   </div>
+              </Card>
+          </div>
+      )}
+
+      {/* Product Editor Modal - REFINED VERSION */}
+      {showProductModal && (
+          <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[200] flex items-center justify-center p-4 overflow-y-auto">
+              <Card className="max-w-4xl w-full p-0 overflow-hidden bg-[#1E1F20] border-[#444746] shadow-2xl animate-in zoom-in-95 duration-300">
+                  <div className="flex justify-between items-center px-8 py-6 bg-[#131314] border-b border-[#444746]">
+                      <div className="flex items-center gap-4">
+                          <div className="p-3 bg-[#A8C7FA]/10 rounded-2xl text-[#A8C7FA]"><ImageIcon className="w-6 h-6" /></div>
+                          <div>
+                            <h2 className="text-xl font-bold text-[#E3E3E3]">{isEditingProduct ? 'Update Digital Asset' : 'New Digital Asset'}</h2>
+                            <p className="text-xs text-[#8E918F] uppercase font-bold tracking-widest mt-1">Catalog Management</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setShowProductModal(false)} className="p-2.5 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5] transition-all">
+                        <X className="w-6 h-6" />
+                      </button>
+                  </div>
+                  
+                  <form onSubmit={handleSaveProduct} className="p-8">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
+                          {/* Left Column: Basic Info */}
+                          <div className="md:col-span-7 space-y-6">
+                              <div className="space-y-4">
+                                  <h4 className="text-xs font-black text-[#A8C7FA] uppercase flex items-center gap-2"><Info className="w-3.5 h-3.5" /> General Details</h4>
+                                  <Input 
+                                      label="Asset Title" 
+                                      placeholder="e.g. Modern Landing Page Template" 
+                                      value={currentProduct.title} 
+                                      onChange={e => setCurrentProduct({...currentProduct, title: e.target.value})} 
+                                      required
+                                  />
+                                  <Textarea 
+                                      label="Pitch Description" 
+                                      placeholder="Tell customers why they should buy this resource..." 
+                                      rows={4}
+                                      value={currentProduct.description} 
+                                      onChange={e => setCurrentProduct({...currentProduct, description: e.target.value})} 
+                                      required
+                                  />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-6">
+                                  <div className="space-y-4">
+                                      <h4 className="text-xs font-black text-[#A8C7FA] uppercase flex items-center gap-2"><DollarSign className="w-3.5 h-3.5" /> Pricing</h4>
+                                      <Input 
+                                          label="Price (₦)" 
+                                          type="number" 
+                                          placeholder="0 for free"
+                                          value={currentProduct.price} 
+                                          onChange={e => setCurrentProduct({...currentProduct, price: parseFloat(e.target.value)})} 
+                                          required
+                                      />
+                                  </div>
+                                  <div className="space-y-4">
+                                      <h4 className="text-xs font-black text-[#A8C7FA] uppercase flex items-center gap-2"><Tag className="w-3.5 h-3.5" /> Classification</h4>
+                                      <div>
+                                          <label className="block text-sm font-medium text-[#C4C7C5] mb-2 ml-1">Category</label>
+                                          <select 
+                                              className="w-full bg-[#131314] border border-[#444746] rounded-2xl p-3.5 text-sm text-[#E3E3E3] outline-none focus:border-[#A8C7FA] transition-all" 
+                                              value={currentProduct.category} 
+                                              onChange={e => setCurrentProduct({...currentProduct, category: e.target.value as ProductCategory})}
+                                          >
+                                              {Object.values(ProductCategory).map(v => <option key={v} value={v}>{v}</option>)}
+                                          </select>
+                                      </div>
+                                  </div>
+                              </div>
+                              
+                              <div className="space-y-4">
+                                  <h4 className="text-xs font-black text-[#A8C7FA] uppercase flex items-center gap-2"><LinkIcon className="w-3.5 h-3.5" /> Resource Links</h4>
+                                  <Input 
+                                      label="Live Preview URL" 
+                                      placeholder="https://..." 
+                                      value={currentProduct.previewUrl} 
+                                      onChange={e => setCurrentProduct({...currentProduct, previewUrl: e.target.value})} 
+                                  />
+                                  <Input 
+                                      label="Download Source (Zip/PDF)" 
+                                      placeholder="Direct link to file" 
+                                      value={currentProduct.downloadUrl} 
+                                      onChange={e => setCurrentProduct({...currentProduct, downloadUrl: e.target.value})} 
+                                      required
+                                  />
+                              </div>
+                          </div>
+
+                          {/* Right Column: Visuals */}
+                          <div className="md:col-span-5 space-y-6">
+                              <div className="space-y-4">
+                                  <h4 className="text-xs font-black text-[#A8C7FA] uppercase flex items-center gap-2"><ImageIcon className="w-3.5 h-3.5" /> Cover Media</h4>
+                                  <div className="aspect-[4/3] bg-[#131314] border-2 border-dashed border-[#444746] rounded-3xl flex flex-col items-center justify-center overflow-hidden relative group">
+                                      {currentProduct.imageUrl ? (
+                                          <>
+                                              <img src={currentProduct.imageUrl} className="w-full h-full object-cover" alt="Preview" />
+                                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                  <Button size="sm" variant="danger" icon={X} onClick={() => setCurrentProduct({...currentProduct, imageUrl: ''})}>Remove</Button>
+                                              </div>
+                                          </>
+                                      ) : (
+                                          <div className="text-center p-6">
+                                              <ImageIcon className="w-10 h-10 text-[#444746] mx-auto mb-3" />
+                                              <p className="text-xs text-[#8E918F]">Thumbnail will appear here once URL is provided</p>
+                                          </div>
+                                      )}
+                                  </div>
+                                  <Input 
+                                      label="Image URL" 
+                                      placeholder="https://images.unsplash.com/..." 
+                                      value={currentProduct.imageUrl} 
+                                      onChange={e => setCurrentProduct({...currentProduct, imageUrl: e.target.value})} 
+                                      required
+                                  />
+                                  <p className="text-[10px] text-[#8E918F] leading-relaxed italic">
+                                      Tip: Use high-quality JPG/PNG images. Unsplash or Cloudinary links work best.
+                                  </p>
+                              </div>
+                          </div>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-4 pt-10 border-t border-[#444746] mt-8">
+                          <Button variant="outline" className="sm:flex-1 py-4 order-2 sm:order-1" onClick={() => setShowProductModal(false)}>Discard Changes</Button>
+                          <Button type="submit" className="sm:flex-1 py-4 order-1 sm:order-2" icon={Save}>
+                              {isEditingProduct ? 'Update Asset' : 'Publish to Marketplace'}
+                          </Button>
+                      </div>
+                  </form>
               </Card>
           </div>
       )}
@@ -586,32 +732,6 @@ export const Admin: React.FC = () => {
                       <div className="flex gap-4"><Button variant="outline" onClick={() => setShowCourseModal(false)}>Discard</Button><Button icon={Save} onClick={handleSaveCourse}>Commit Curriculum</Button></div>
                   </div>
               </div>
-          </div>
-      )}
-
-      {/* Product Editor Modal */}
-      {showProductModal && (
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
-              <Card className="max-lg w-full p-10">
-                  <h2 className="text-2xl font-bold text-[#E3E3E3] mb-8">{isEditingProduct ? 'Edit Asset' : 'New Digital Asset'}</h2>
-                  <form onSubmit={handleSaveProduct} className="space-y-6">
-                      <Input label="Title" value={currentProduct.title} onChange={e => setCurrentProduct({...currentProduct, title: e.target.value})} />
-                      <Textarea label="Pitch Description" value={currentProduct.description} onChange={e => setCurrentProduct({...currentProduct, description: e.target.value})} />
-                      <div className="grid grid-cols-2 gap-4">
-                          <Input label="Price (₦)" type="number" value={currentProduct.price} onChange={e => setCurrentProduct({...currentProduct, price: parseFloat(e.target.value)})} />
-                          <div>
-                              <label className="block text-xs font-bold text-[#8E918F] uppercase mb-2">Category</label>
-                              <select className="w-full bg-[#131314] border border-[#444746] rounded-2xl p-3.5 text-sm text-[#E3E3E3]" value={currentProduct.category} onChange={e => setCurrentProduct({...currentProduct, category: e.target.value as ProductCategory})}>
-                                  {Object.values(ProductCategory).map(v => <option key={v} value={v}>{v}</option>)}
-                              </select>
-                          </div>
-                      </div>
-                      <Input label="Preview Image URL" value={currentProduct.imageUrl} onChange={e => setCurrentProduct({...currentProduct, imageUrl: e.target.value})} />
-                      <Input label="Live Preview URL (Optional)" value={currentProduct.previewUrl} onChange={e => setCurrentProduct({...currentProduct, previewUrl: e.target.value})} />
-                      <Input label="Direct Download URL" value={currentProduct.downloadUrl} onChange={e => setCurrentProduct({...currentProduct, downloadUrl: e.target.value})} />
-                      <div className="flex gap-4 pt-4"><Button variant="outline" className="flex-1" onClick={() => setShowProductModal(false)}>Cancel</Button><Button type="submit" className="flex-1">Save Asset</Button></div>
-                  </form>
-              </Card>
           </div>
       )}
 

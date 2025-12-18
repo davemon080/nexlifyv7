@@ -12,6 +12,7 @@ export const Navbar: React.FC = () => {
   const [appSettings, setAppSettings] = useState<AppSettings>(getAppSettings());
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notifRef = useRef<HTMLDivElement>(null);
+  const mobileNotifRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -38,6 +39,9 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
+      }
+      if (mobileNotifRef.current && !mobileNotifRef.current.contains(event.target as Node)) {
         setIsNotifOpen(false);
       }
     };
@@ -93,6 +97,43 @@ export const Navbar: React.FC = () => {
       }
   };
 
+  const NotificationDrawer = ({ isMobile = false }: { isMobile?: boolean }) => (
+    <div className={`${isMobile ? 'fixed inset-x-0 top-20 bottom-0 z-[60] h-[calc(100vh-80px)]' : 'absolute right-0 mt-4 w-80 md:w-96'} bg-[#1E1F20] border border-[#444746] ${!isMobile && 'rounded-2xl shadow-2xl'} overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200`}>
+        <div className="p-4 bg-[#131314] border-b border-[#444746] flex justify-between items-center">
+            <h3 className="font-bold text-[#E3E3E3]">Notifications</h3>
+            <UIBadge color="blue">{unreadCount} New</UIBadge>
+        </div>
+        <div className={`${isMobile ? 'h-[calc(100%-110px)]' : 'max-h-[400px]'} overflow-y-auto custom-scrollbar`}>
+            {notifications.length === 0 ? (
+                <div className="p-10 text-center text-[#8E918F]">
+                    <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">No notifications yet.</p>
+                </div>
+            ) : (
+                notifications.map(notif => (
+                    <div key={notif.id} onClick={() => handleMarkRead(notif.id)} className={`p-4 border-b border-[#444746] hover:bg-[#2D2E30] transition-colors cursor-pointer relative ${!notif.isRead ? 'bg-[#A8C7FA]/5' : ''}`}>
+                        {!notif.isRead && <div className="absolute top-4 right-4 w-2 h-2 bg-[#A8C7FA] rounded-full" />}
+                        <div className="flex gap-3">
+                            <div className="mt-1">{getNotifIcon(notif.type)}</div>
+                            <div className="flex-1">
+                                <h4 className="text-sm font-bold text-[#E3E3E3] mb-1">{notif.title}</h4>
+                                <p className="text-xs text-[#C4C7C5] leading-relaxed mb-2">{notif.message}</p>
+                                <div className="flex items-center gap-1 text-[10px] text-[#8E918F]">
+                                    <Clock className="w-3 h-3" />
+                                    {new Date(notif.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))
+            )}
+        </div>
+        <div className="p-3 bg-[#131314] text-center border-t border-[#444746]">
+            <button className="text-xs text-[#A8C7FA] hover:underline font-medium">Mark all as read</button>
+        </div>
+    </div>
+  );
+
   return (
     <nav className="fixed w-full top-0 z-50 bg-[#131314]/90 backdrop-blur-xl border-b border-[#444746]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -130,42 +171,7 @@ export const Navbar: React.FC = () => {
                           )}
                       </button>
 
-                      {isNotifOpen && (
-                          <div className="absolute right-0 mt-4 w-80 md:w-96 bg-[#1E1F20] border border-[#444746] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                              <div className="p-4 bg-[#131314] border-b border-[#444746] flex justify-between items-center">
-                                  <h3 className="font-bold text-[#E3E3E3]">Notifications</h3>
-                                  <UIBadge color="blue">{unreadCount} New</UIBadge>
-                              </div>
-                              <div className="max-h-[400px] overflow-y-auto">
-                                  {notifications.length === 0 ? (
-                                      <div className="p-10 text-center text-[#8E918F]">
-                                          <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                          <p className="text-sm">No notifications yet.</p>
-                                      </div>
-                                  ) : (
-                                      notifications.map(notif => (
-                                          <div key={notif.id} onClick={() => handleMarkRead(notif.id)} className={`p-4 border-b border-[#444746] hover:bg-[#2D2E30] transition-colors cursor-pointer relative ${!notif.isRead ? 'bg-[#A8C7FA]/5' : ''}`}>
-                                              {!notif.isRead && <div className="absolute top-4 right-4 w-2 h-2 bg-[#A8C7FA] rounded-full" />}
-                                              <div className="flex gap-3">
-                                                  <div className="mt-1">{getNotifIcon(notif.type)}</div>
-                                                  <div className="flex-1">
-                                                      <h4 className="text-sm font-bold text-[#E3E3E3] mb-1">{notif.title}</h4>
-                                                      <p className="text-xs text-[#C4C7C5] leading-relaxed mb-2">{notif.message}</p>
-                                                      <div className="flex items-center gap-1 text-[10px] text-[#8E918F]">
-                                                          <Clock className="w-3 h-3" />
-                                                          {new Date(notif.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                                      </div>
-                                                  </div>
-                                              </div>
-                                          </div>
-                                      ))
-                                  )}
-                              </div>
-                              <div className="p-3 bg-[#131314] text-center border-t border-[#444746]">
-                                  <button className="text-xs text-[#A8C7FA] hover:underline font-medium">Mark all as read</button>
-                              </div>
-                          </div>
-                      )}
+                      {isNotifOpen && <NotificationDrawer />}
                   </div>
               )}
 
@@ -179,17 +185,37 @@ export const Navbar: React.FC = () => {
 
           <div className="flex items-center lg:hidden gap-2">
             {currentUser && (
-               <button onClick={() => navigate('/profile')} className="p-2 text-[#C4C7C5] hover:text-[#E3E3E3] relative">
+               <button 
+                onClick={() => {
+                    setIsNotifOpen(!isNotifOpen);
+                    if(isOpen) setIsOpen(false);
+                }} 
+                className={`p-2 rounded-full transition-all relative ${isNotifOpen ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#C4C7C5]'}`}
+               >
                   <Bell className="w-6 h-6" />
-                  {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-[#CF6679] rounded-full"></span>}
+                  {unreadCount > 0 && (
+                      <span className={`absolute top-1 right-1 w-4 h-4 bg-[#CF6679] text-[#370007] text-[8px] font-bold rounded-full flex items-center justify-center border-2 ${isNotifOpen ? 'border-[#A8C7FA]' : 'border-[#131314]'}`}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                  )}
                </button>
             )}
-            <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-full text-[#C4C7C5] hover:text-[#E3E3E3] hover:bg-[#1E1F20]">
+            <button onClick={() => {
+                setIsOpen(!isOpen);
+                if(isNotifOpen) setIsNotifOpen(false);
+            }} className="p-2 rounded-full text-[#C4C7C5] hover:text-[#E3E3E3] hover:bg-[#1E1F20]">
               {isOpen ? <X className="block h-6 w-6" /> : <Menu className="block h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Notification View */}
+      {isNotifOpen && (
+          <div className="lg:hidden" ref={mobileNotifRef}>
+              <NotificationDrawer isMobile />
+          </div>
+      )}
 
       <div className={`lg:hidden transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
         <div className="bg-[#131314] border-t border-[#444746] shadow-xl">
