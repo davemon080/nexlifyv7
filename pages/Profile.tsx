@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, updateUser, changePassword, getCourses, getProducts } from '../services/mockData';
 import { User, Course, Product } from '../types';
 import { Card, Button, Badge, Input } from '../components/UI';
+import { useFeedback } from '../App';
 import { User as UserIcon, LogOut, Wallet, BookOpen, Clock, Settings, X, Save, Lock, Camera, Upload, Download, ShoppingBag } from 'lucide-react';
 
 export const Profile: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
+  const { showToast, showDialog } = useFeedback();
   const [enrolledCoursesData, setEnrolledCoursesData] = useState<Course[]>([]);
   const [purchasedProductsData, setPurchasedProductsData] = useState<Product[]>([]);
   const [showSettings, setShowSettings] = useState(false);
@@ -27,14 +29,11 @@ export const Profile: React.FC = () => {
   }, [navigate]);
 
   const loadUserAssets = async (currentUser: User) => {
-      // Load Courses
       if (currentUser.enrolledCourses && currentUser.enrolledCourses.length > 0) {
           const allCourses = await getCourses();
           const userCourses = allCourses.filter(c => currentUser.enrolledCourses?.includes(c.id));
           setEnrolledCoursesData(userCourses);
       }
-      
-      // Load Products
       if (currentUser.purchasedProducts && currentUser.purchasedProducts.length > 0) {
           const allProducts = await getProducts();
           const userProducts = allProducts.filter(p => currentUser.purchasedProducts?.includes(p.id));
@@ -43,52 +42,31 @@ export const Profile: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('isAdmin');
-    navigate('/login');
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && user) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        setIsLoading(true);
-        const base64String = reader.result as string;
-        try {
-            const updatedUser = { ...user, photoUrl: base64String };
-            await updateUser(updatedUser);
-            // Update local storage and state
-            localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-            setUser(updatedUser);
-        } catch (error) {
-            console.error(error);
-            alert('Failed to upload image. In local mode, this persists to browser storage.');
-        } finally {
-            setIsLoading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
+    showDialog({
+      title: 'Sign Out',
+      message: 'Are you sure you want to log out of your Nexlify account?',
+      type: 'confirm',
+      onConfirm: () => {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('isAdmin');
+        navigate('/login');
+      }
+    });
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    
     setIsLoading(true);
     try {
         const updatedUser = { ...user, name: editForm.name, email: editForm.email };
         await updateUser(updatedUser);
-        
-        // Update local storage and state
         localStorage.setItem('currentUser', JSON.stringify(updatedUser));
         setUser(updatedUser);
-        
-        alert('Profile updated successfully!');
+        showToast("Profile updated successfully!", 'success');
         setShowSettings(false);
     } catch (error: any) {
-        alert(error.message || 'Failed to update profile');
+        showToast("Failed to update profile", 'error');
     } finally {
         setIsLoading(false);
     }
@@ -97,19 +75,17 @@ export const Profile: React.FC = () => {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-
     if (passwordForm.new !== passwordForm.confirm) {
-        alert('New passwords do not match');
+        showToast("New passwords do not match", 'error');
         return;
     }
-    
     setIsLoading(true);
     try {
         await changePassword(user.id, passwordForm.current, passwordForm.new);
-        alert('Password changed successfully!');
+        showToast("Password changed successfully!", 'success');
         setPasswordForm({ current: '', new: '', confirm: '' });
     } catch (error: any) {
-        alert(error.message || 'Failed to change password');
+        showToast(error.message || "Security update failed", 'error');
     } finally {
         setIsLoading(false);
     }
@@ -117,14 +93,13 @@ export const Profile: React.FC = () => {
 
   const handleDownloadProduct = (product: Product) => {
     if (product.downloadUrl) {
+      showToast(`Starting download: ${product.title}`, 'info');
       const link = document.createElement('a');
       link.href = product.downloadUrl;
       link.download = `${product.title.replace(/\s+/g, '_')}${product.category === 'Ebook' ? '.pdf' : '.zip'}`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } else {
-        alert("Preparing download...");
     }
   };
 
@@ -133,29 +108,11 @@ export const Profile: React.FC = () => {
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        
-        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <div className="flex items-center gap-6">
             <div className="relative group">
                 <div className="w-24 h-24 md:w-32 md:h-32 rounded-full overflow-hidden border-4 border-[#1E1F20] shadow-xl bg-[#4285F4] flex items-center justify-center text-4xl font-bold text-white relative">
-                    {user.photoUrl ? (
-                        <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" />
-                    ) : (
-                        user.name.charAt(0).toUpperCase()
-                    )}
-                    
-                    {/* Overlay for upload */}
-                    <label className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                        <Camera className="w-8 h-8 text-white" />
-                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                    </label>
-                </div>
-                <div className="absolute bottom-0 right-0 bg-[#1E1F20] rounded-full p-1.5 border border-[#444746] md:hidden">
-                     <label className="cursor-pointer">
-                        <Camera className="w-4 h-4 text-[#A8C7FA]" />
-                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
-                    </label>
+                    {user.photoUrl ? <img src={user.photoUrl} alt={user.name} className="w-full h-full object-cover" /> : user.name.charAt(0).toUpperCase()}
                 </div>
             </div>
             <div>
@@ -174,11 +131,7 @@ export const Profile: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
-          {/* Main Info */}
           <div className="md:col-span-2 space-y-8">
-            
-            {/* Wallet / Earnings */}
             <Card className="p-8 bg-gradient-to-br from-[#1E1F20] to-[#131314]">
               <div className="flex items-start justify-between">
                 <div>
@@ -195,7 +148,6 @@ export const Profile: React.FC = () => {
               </div>
             </Card>
 
-            {/* Enrolled Courses */}
             <div>
               <h3 className="text-xl font-bold text-[#E3E3E3] mb-4 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-[#A8C7FA]" /> My Learning
@@ -208,7 +160,7 @@ export const Profile: React.FC = () => {
                           <img src={course.thumbnail} alt={course.title} className="w-12 h-12 rounded-lg object-cover bg-[#131314]" />
                           <div>
                             <h4 className="font-bold text-[#E3E3E3] group-hover:text-[#A8C7FA] transition-colors">{course.title}</h4>
-                            <p className="text-xs text-[#8E918F]">3 Modules • In Progress</p>
+                            <p className="text-xs text-[#8E918F]">{course.modules.length} Modules • Lifetime Access</p>
                           </div>
                         </div>
                         <Badge color="blue">Continue</Badge>
@@ -223,7 +175,6 @@ export const Profile: React.FC = () => {
               )}
             </div>
             
-            {/* My Downloads */}
             <div>
               <h3 className="text-xl font-bold text-[#E3E3E3] mb-4 flex items-center gap-2">
                 <ShoppingBag className="w-5 h-5 text-[#9B72CB]" /> My Downloads
@@ -252,20 +203,8 @@ export const Profile: React.FC = () => {
                   </Card>
               )}
             </div>
-            
-             {/* Tasks (Placeholder) */}
-             <div>
-              <h3 className="text-xl font-bold text-[#E3E3E3] mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-[#D96570]" /> Active Tasks
-              </h3>
-              <Card className="p-8 text-center border-dashed border-[#444746]">
-                  <p className="text-[#8E918F] mb-4">No active tasks assigned.</p>
-                  <Button variant="outline" onClick={() => navigate('/earn')}>Find Work</Button>
-              </Card>
-            </div>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
             <Card className="p-6">
               <h3 className="text-lg font-bold text-[#E3E3E3] mb-4">Account Details</h3>
@@ -291,16 +230,17 @@ export const Profile: React.FC = () => {
                 Share your unique link and earn ₦1,000 for every active user you refer.
               </p>
               <div className="bg-[#131314] p-2 rounded-lg flex justify-between items-center text-xs text-[#8E918F] mb-3">
-                <span className="truncate">nexlify.com/ref/{user.id}</span>
+                <span className="truncate">nexlify.com.ng/ref/{user.id}</span>
               </div>
-              <Button size="sm" className="w-full">Copy Link</Button>
+              <Button size="sm" className="w-full" onClick={() => {
+                navigator.clipboard.writeText(`https://nexlify.com.ng/#/register?ref=${user.id}`);
+                showToast("Referral link copied!", 'success');
+              }}>Copy Link</Button>
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
             <Card className="max-w-2xl w-full bg-[#1E1F20] max-h-[90vh] flex flex-col overflow-hidden p-0 border border-[#444746]">
@@ -313,48 +253,19 @@ export const Profile: React.FC = () => {
                     <section>
                         <h3 className="text-[#A8C7FA] font-medium mb-4 flex items-center gap-2"><UserIcon className="w-5 h-5" /> Personal Information</h3>
                         <form onSubmit={handleUpdateProfile} className="space-y-4">
-                            <Input 
-                                label="Full Name" 
-                                value={editForm.name} 
-                                onChange={(e) => setEditForm({...editForm, name: e.target.value})} 
-                            />
-                            <Input 
-                                label="Email Address" 
-                                type="email"
-                                value={editForm.email} 
-                                onChange={(e) => setEditForm({...editForm, email: e.target.value})} 
-                            />
+                            <Input label="Full Name" value={editForm.name} onChange={(e) => setEditForm({...editForm, name: e.target.value})} />
+                            <Input label="Email Address" type="email" value={editForm.email} onChange={(e) => setEditForm({...editForm, email: e.target.value})} />
                             <Button type="submit" isLoading={isLoading} icon={Save}>Update Profile</Button>
                         </form>
                     </section>
-
                     <div className="border-t border-[#444746]" />
-
                     <section>
                         <h3 className="text-[#CF6679] font-medium mb-4 flex items-center gap-2"><Lock className="w-5 h-5" /> Security</h3>
                         <form onSubmit={handleChangePassword} className="space-y-4">
-                            <Input 
-                                label="Current Password" 
-                                type="password" 
-                                value={passwordForm.current}
-                                onChange={(e) => setPasswordForm({...passwordForm, current: e.target.value})}
-                                required
-                            />
+                            <Input label="Current Password" type="password" value={passwordForm.current} onChange={(e) => setPasswordForm({...passwordForm, current: e.target.value})} required />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <Input 
-                                    label="New Password" 
-                                    type="password" 
-                                    value={passwordForm.new}
-                                    onChange={(e) => setPasswordForm({...passwordForm, new: e.target.value})}
-                                    required
-                                />
-                                <Input 
-                                    label="Confirm New Password" 
-                                    type="password" 
-                                    value={passwordForm.confirm}
-                                    onChange={(e) => setPasswordForm({...passwordForm, confirm: e.target.value})}
-                                    required
-                                />
+                                <Input label="New Password" type="password" value={passwordForm.new} onChange={(e) => setPasswordForm({...passwordForm, new: e.target.value})} required />
+                                <Input label="Confirm New Password" type="password" value={passwordForm.confirm} onChange={(e) => setPasswordForm({...passwordForm, confirm: e.target.value})} required />
                             </div>
                             <Button type="submit" variant="secondary" isLoading={isLoading} icon={Save}>Change Password</Button>
                         </form>

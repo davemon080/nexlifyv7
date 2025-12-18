@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getCourseById, getCompletedLessons, saveCompletedLesson } from '../services/mockData';
 import { Course, Module, Lesson } from '../types';
 import { Button, Card, Badge } from '../components/UI';
-// Added ChevronDown to the imports from lucide-react
+import { useFeedback } from '../App';
 import { PlayCircle, CheckCircle, Lock, Menu, FileText, Video, X, ChevronRight, ChevronLeft, ChevronDown, HelpCircle, Download, ExternalLink, Loader2 } from 'lucide-react';
 
 const getYouTubeEmbedUrl = (url: string) => {
@@ -29,6 +28,7 @@ const getYouTubeEmbedUrl = (url: string) => {
 export const Classroom: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showToast, showDialog, celebrate } = useFeedback();
   const [course, setCourse] = useState<Course | undefined>(undefined);
   const [activeModule, setActiveModule] = useState<Module | undefined>(undefined);
   const [activeLesson, setActiveLesson] = useState<Lesson | undefined>(undefined);
@@ -91,7 +91,6 @@ export const Classroom: React.FC = () => {
       setQuizAnswers({}); 
       setQuizSubmitted(false); 
       setQuizScore(0); 
-      // Scroll content area to top on lesson change
       const contentArea = document.getElementById('classroom-content');
       if (contentArea) contentArea.scrollTo(0, 0);
   }, [activeLesson]);
@@ -99,10 +98,16 @@ export const Classroom: React.FC = () => {
   const handleMarkComplete = () => {
       if(!course || !activeLesson) return;
       if (activeLesson.type === 'quiz' && (!quizSubmitted || quizScore < 50)) {
-          alert("Score at least 50% to pass this quiz."); return;
+          showDialog({
+            title: 'Quiz Required',
+            message: 'You need to score at least 50% to pass this lesson.',
+            onConfirm: () => {}
+          });
+          return;
       }
       saveCompletedLesson(course.id, activeLesson.id);
       if(!completedIds.includes(activeLesson.id)) setCompletedIds([...completedIds, activeLesson.id]);
+      showToast(`${activeLesson.title} completed!`, 'success');
       handleNext();
   };
 
@@ -118,8 +123,12 @@ export const Classroom: React.FC = () => {
               setActiveModule(course.modules[mIdx + 1]);
               setActiveLesson(course.modules[mIdx + 1].lessons[0]);
           } else { 
-              alert("Congratulations! You've completed the curriculum."); 
-              navigate('/profile');
+              celebrate();
+              showDialog({
+                title: 'Congratulations! 🎉',
+                message: "You have completed the entire curriculum! You're now ready for the next level of your digital journey.",
+                onConfirm: () => navigate('/profile')
+              });
           }
       }
   };
@@ -143,15 +152,17 @@ export const Classroom: React.FC = () => {
       if (!activeLesson?.questions) return;
       let correct = 0;
       activeLesson.questions.forEach(q => { if (quizAnswers[q.id] === q.correctAnswer) correct++; });
-      setQuizScore((correct / activeLesson.questions.length) * 100);
+      const score = (correct / activeLesson.questions.length) * 100;
+      setQuizScore(score);
       setQuizSubmitted(true);
+      if (score >= 50) showToast("Passing score achieved!", 'success');
+      else showToast("Quiz failed. Please try again.", 'error');
   };
 
   if (!course || !activeModule || !activeLesson) return <div className="h-screen bg-[#131314] flex items-center justify-center text-[#A8C7FA]"><Loader2 className="animate-spin w-10 h-10" /></div>;
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden relative bg-[#0E0E0E] flex-col md:flex-row">
-      {/* Sidebar Overlay for Mobile */}
       {sidebarOpen && (
           <div 
             className="fixed inset-0 bg-black/90 z-[90] lg:hidden animate-in fade-in duration-300" 
@@ -159,7 +170,6 @@ export const Classroom: React.FC = () => {
           />
       )}
       
-      {/* Sidebar Navigation */}
       <div className={`fixed lg:relative inset-y-0 left-0 z-[100] w-full sm:w-80 bg-[#1E1F20] border-r border-[#444746] transition-transform duration-300 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="p-6 border-b border-[#444746] flex items-center justify-between sticky top-0 bg-[#1E1F20] z-10">
             <h2 className="font-bold text-[#E3E3E3] truncate text-xs uppercase tracking-[0.2em]">{course.title}</h2>
@@ -210,9 +220,7 @@ export const Classroom: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col w-full relative h-full">
-        {/* Top bar */}
         <div className="px-4 md:px-8 py-4 flex items-center justify-between border-b border-[#444746] bg-[#131314]/95 backdrop-blur-xl sticky top-0 z-20">
             <div className="flex items-center gap-3 md:gap-6 min-w-0">
                 <button onClick={() => setSidebarOpen(true)} className="p-2 -ml-2 text-[#C4C7C5] hover:bg-[#1E1F20] rounded-xl lg:hidden">
@@ -234,7 +242,6 @@ export const Classroom: React.FC = () => {
             </div>
         </div>
 
-        {/* Scrollable Content */}
         <div id="classroom-content" className="flex-1 overflow-y-auto p-4 md:p-10 no-scrollbar pb-32">
             <div className="max-w-4xl mx-auto space-y-6 md:space-y-10">
                 {activeLesson.type === 'video' ? (
@@ -326,7 +333,6 @@ export const Classroom: React.FC = () => {
             </div>
         </div>
 
-        {/* Bottom Navigation (Fixed on mobile) */}
         <div className="px-4 md:px-8 py-6 border-t border-[#444746] bg-[#131314] flex flex-row justify-between items-center gap-4 fixed md:relative bottom-0 left-0 right-0 z-30 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] md:shadow-none">
             <button 
                 onClick={handlePrevious} 

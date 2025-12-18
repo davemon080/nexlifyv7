@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getProducts, logUserActivity, getCurrentUser, recordTransaction, sendNotification } from '../services/mockData';
 import { Product, ProductCategory, User } from '../types';
 import { Button, Card, Badge } from '../components/UI';
+import { useFeedback } from '../App';
 import { Search, Filter, Download, ShoppingCart, Loader2, Eye, X, Share2, PackageOpen, LayoutGrid, CheckCircle, Clock, Smartphone, Monitor } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SEO } from '../components/SEO';
@@ -9,6 +10,7 @@ import { SEO } from '../components/SEO';
 export const Marketplace: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { showToast, showDialog } = useFeedback();
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +71,7 @@ export const Marketplace: React.FC = () => {
             message: `You have successfully downloaded "${product.title}". Check your downloads folder.`,
             type: 'info'
         });
+        showToast("Starting download...", 'info');
     }
 
     if (product.downloadUrl) {
@@ -78,8 +81,6 @@ export const Marketplace: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } else {
-      alert(`Simulation: Downloading ${product.title}...`);
     }
   };
 
@@ -91,29 +92,33 @@ export const Marketplace: React.FC = () => {
     const price = Number(product.price);
     if (price > 0) {
          const PaystackPop = (window as any).PaystackPop;
-         if (!PaystackPop) { alert("Payment system unavailable. Please refresh."); return; }
+         if (!PaystackPop) { 
+           showDialog({ title: 'Payment Unavailable', message: 'The payment system is currently unavailable. Please refresh or try again later.', onConfirm: () => {} });
+           return; 
+         }
          const paystackKey = 'pk_test_e9672a354a3fbf8d3e696c1265b29355181a3e11'; 
          try {
              const handler = PaystackPop.setup({
-                 key: paystackKey,
-                 email: currentUser.email,
-                 amount: Math.ceil(price * 100),
-                 currency: 'NGN',
+                 key: paystackKey, email: currentUser.email, amount: Math.ceil(price * 100), currency: 'NGN',
                  ref: `nex-prod-${Date.now()}`,
                  callback: function(response: any) {
                      recordTransaction(currentUser.id, 'product_purchase', product.id, price, response.reference).then(() => {
                         setUser(getCurrentUser());
                         handleDownload(product);
                         setPreviewProduct(null);
+                        showToast("Purchase successful!", 'success');
                      });
                  },
                  onClose: () => {},
              });
              handler.openIframe();
-         } catch (err: any) { alert("Payment Error"); }
+         } catch (err: any) { 
+           showToast("Could not initiate payment.", 'error'); 
+         }
     } else {
          handleDownload(product);
          setPreviewProduct(null);
+         showToast("Free asset added to library.", 'success');
     }
   };
 
@@ -121,7 +126,7 @@ export const Marketplace: React.FC = () => {
     e.stopPropagation();
     const url = `${window.location.origin}/#/market?product=${product.id}`;
     if (navigator.share) { try { await navigator.share({ title: product.title, url }); } catch (error) {} } 
-    else { navigator.clipboard.writeText(url); alert("Link copied!"); }
+    else { navigator.clipboard.writeText(url); showToast("Link copied to clipboard.", 'success'); }
   };
 
   const categories = ['All', ...Object.values(ProductCategory)];
@@ -190,11 +195,9 @@ export const Marketplace: React.FC = () => {
         )}
       </div>
 
-      {/* PROFESSIONAL PREVIEW MODAL */}
       {previewProduct && (
           <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-10 animate-in fade-in duration-300">
               <div className="w-full max-w-7xl h-full bg-[#1E1F20] rounded-[48px] flex flex-col border border-[#444746] overflow-hidden shadow-2xl">
-                  {/* Modal Header */}
                   <div className="flex justify-between items-center px-10 py-6 border-b border-[#444746] bg-[#131314]">
                       <div className="flex items-center gap-6">
                         <div className="p-3 bg-[#A8C7FA]/10 rounded-2xl"><Eye className="text-[#A8C7FA]" /></div>
@@ -207,17 +210,10 @@ export const Marketplace: React.FC = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
-                        {previewProduct.category === 'Template' && (
-                            <div className="hidden md:flex bg-[#131314] p-1 rounded-full border border-[#444746]">
-                                <button onClick={() => setPreviewMode('desktop')} className={`p-2 rounded-full transition-all ${previewMode === 'desktop' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#8E918F]'}`}><Monitor className="w-5 h-5" /></button>
-                                <button onClick={() => setPreviewMode('mobile')} className={`p-2 rounded-full transition-all ${previewMode === 'mobile' ? 'bg-[#A8C7FA] text-[#062E6F]' : 'text-[#8E918F]'}`}><Smartphone className="w-5 h-5" /></button>
-                            </div>
-                        )}
                         <button onClick={() => setPreviewProduct(null)} className="p-3 hover:bg-[#2D2E30] rounded-full text-[#C4C7C5] transition-all"><X className="w-8 h-8" /></button>
                       </div>
                   </div>
                   
-                  {/* Modal Body */}
                   <div className="flex-1 bg-[#000] flex items-center justify-center p-4">
                       <div className={`transition-all duration-500 ease-in-out bg-white rounded-2xl overflow-hidden shadow-2xl ${previewMode === 'mobile' ? 'w-[375px] h-[667px]' : 'w-full h-full'}`}>
                           {previewProduct.previewUrl ? (
@@ -228,7 +224,6 @@ export const Marketplace: React.FC = () => {
                       </div>
                   </div>
 
-                  {/* Modal Footer */}
                   <div className="px-10 py-8 bg-[#131314] border-t border-[#444746] flex items-center justify-between">
                         <div className="flex items-center gap-10">
                             <div>
