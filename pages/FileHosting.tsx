@@ -1,11 +1,8 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, Badge, Input } from '../components/UI';
 import { useFeedback } from '../App';
-import { getHostedFiles, uploadHostedFile, deleteHostedFile } from '../services/mockData';
-// Fixed HostedFile import to point to types.ts where it is defined
-import { HostedFile } from '../types';
+import { getHostedFiles, uploadHostedFile, deleteHostedFile, HostedFile } from '../services/mockData';
 import { Upload, Trash2, Copy, FileCode, CheckCircle, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
 
 export const FileHosting: React.FC = () => {
